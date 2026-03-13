@@ -1,8 +1,16 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+@custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  --background: #ffffff;
+  --background: #fafafa;
   --foreground: #171717;
+}
+
+.dark {
+  --background: #0a0a0a;
+  --foreground: #d4d4d4;
 }
 
 @theme inline {
@@ -12,15 +20,65 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Prose overrides for brand voice: clean, high density, terminal aesthetic */
+.prose {
+  --tw-prose-body: #a3a3a3;
+  --tw-prose-headings: #e5e5e5;
+  --tw-prose-links: #e5e5e5;
+  --tw-prose-bold: #e5e5e5;
+  --tw-prose-code: #d4d4d4;
+  --tw-prose-pre-bg: #171717;
+  --tw-prose-pre-code: #d4d4d4;
+  --tw-prose-counters: #737373;
+  --tw-prose-bullets: #525252;
+  --tw-prose-hr: #262626;
+  --tw-prose-quotes: #a3a3a3;
+  --tw-prose-quote-borders: #262626;
+  --tw-prose-th-borders: #262626;
+  --tw-prose-td-borders: #1a1a1a;
+}
+
+.prose pre {
+  border: 1px solid #262626;
+  border-radius: 6px;
+}
+
+.prose code:not(pre code) {
+  background: #1a1a1a;
+  padding: 0.15em 0.4em;
+  border-radius: 3px;
+  font-size: 0.875em;
+}
+
+.prose a {
+  text-decoration-color: #525252;
+  text-underline-offset: 3px;
+}
+
+.prose a:hover {
+  text-decoration-color: #a3a3a3;
+}
+
+/* Light mode prose */
+:root:not(.dark) .prose {
+  --tw-prose-body: #404040;
+  --tw-prose-headings: #171717;
+  --tw-prose-links: #171717;
+  --tw-prose-bold: #171717;
+  --tw-prose-code: #262626;
+  --tw-prose-pre-bg: #f5f5f5;
+  --tw-prose-pre-code: #262626;
+}
+
+:root:not(.dark) .prose pre {
+  border-color: #e5e5e5;
+}
+
+:root:not(.dark) .prose code:not(pre code) {
+  background: #f5f5f5;
 }
