@@ -1,51 +1,51 @@
 import { getBlogPosts, getConversationPosts } from "@/lib/content";
 import { PostCard } from "@/components/post-card";
+import { HeroSection } from "@/components/sections/hero";
+import { MetricsStrip } from "@/components/sections/metrics";
+import { ContentPillars } from "@/components/sections/content-pillars";
+import { BuildsTeaser } from "@/components/sections/builds-teaser";
+import { CtaSection } from "@/components/sections/cta";
 
 export default function Home() {
   const blogPosts = getBlogPosts().slice(0, 5);
   const conversations = getConversationPosts().slice(0, 3);
 
   return (
-    <div className="max-w-3xl mx-auto px-6 py-16">
-      <header className="mb-16">
-        <p className="font-mono text-sm text-neutral-600 mb-3">A.R.A.G.O.N.</p>
-        <h1 className="text-2xl text-neutral-100 leading-tight mb-4">
-          Practitioner-led AI development content.
-        </h1>
-        <p className="text-sm text-neutral-500 max-w-xl leading-relaxed">
-          Build logs, architectural patterns, cost breakdowns, and tool
-          autopsies from real projects. What actually worked, what didn&apos;t,
-          and why.
-        </p>
-      </header>
+    <div>
+      <HeroSection />
+      <MetricsStrip />
 
-      {blogPosts.length > 0 && (
-        <section className="mb-16">
-          <h2 className="font-mono text-xs text-neutral-600 uppercase tracking-wider mb-6">
-            Recent Posts
-          </h2>
-          {blogPosts.map((post) => (
-            <PostCard key={post.meta.slug} post={post.meta} />
-          ))}
-        </section>
-      )}
+      <div className="max-w-5xl mx-auto px-6 py-20">
+        {blogPosts.length > 0 && (
+          <section className="mb-20">
+            <h2 className="text-3xl font-semibold text-neutral-100 mb-8">
+              Recent Posts
+            </h2>
+            <div className="space-y-1">
+              {blogPosts.map((post) => (
+                <PostCard key={post.meta.slug} post={post.meta} />
+              ))}
+            </div>
+          </section>
+        )}
 
-      {conversations.length > 0 && (
-        <section>
-          <h2 className="font-mono text-xs text-neutral-600 uppercase tracking-wider mb-6">
-            Conversations with Claude
-          </h2>
-          {conversations.map((post) => (
-            <PostCard key={post.meta.slug} post={post.meta} />
-          ))}
-        </section>
-      )}
+        {conversations.length > 0 && (
+          <section className="mb-20">
+            <h2 className="text-3xl font-semibold text-neutral-100 mb-8">
+              Conversations with Claude
+            </h2>
+            <div className="space-y-1">
+              {conversations.map((post) => (
+                <PostCard key={post.meta.slug} post={post.meta} />
+              ))}
+            </div>
+          </section>
+        )}
+      </div>
 
-      {blogPosts.length === 0 && conversations.length === 0 && (
-        <p className="text-sm text-neutral-600 font-mono">
-          First posts incoming.
-        </p>
-      )}
+      <ContentPillars />
+      <BuildsTeaser />
+      <CtaSection />
     </div>
   );
 }
