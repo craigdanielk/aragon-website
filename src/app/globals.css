@@ -6,18 +6,48 @@
 :root {
   --background: #fafafa;
   --foreground: #171717;
+  --accent-green: #00FF41;
+  --accent-blue: #0D47A1;
+  --accent-blue-hover: #1565C0;
+  --accent-green-glow: rgba(0, 255, 65, 0.06);
+  --accent-blue-glow: rgba(13, 71, 161, 0.08);
+  --surface: #f0f0f0;
+  --surface-elevated: #ffffff;
+  --border: #e5e5e5;
 }
 
 .dark {
   --background: #0a0a0a;
   --foreground: #d4d4d4;
+  --accent-green: #00FF41;
+  --accent-blue: #0D47A1;
+  --accent-blue-hover: #1565C0;
+  --accent-green-glow: rgba(0, 255, 65, 0.05);
+  --accent-blue-glow: rgba(13, 71, 161, 0.1);
+  --surface: #111111;
+  --surface-elevated: #1a1a1a;
+  --border: #262626;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-accent-green: var(--accent-green);
+  --color-accent-blue: var(--accent-blue);
+  --color-accent-blue-hover: var(--accent-blue-hover);
+  --color-surface: var(--surface);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-border: var(--border);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 body {

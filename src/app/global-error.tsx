@@ -1,7 +1,6 @@
 "use client";
 
 export default function GlobalError({
-  error,
   reset,
 }: {
   error: Error & { digest?: string };
@@ -9,12 +8,12 @@ export default function GlobalError({
 }) {
   return (
     <html lang="en">
-      <body className="bg-neutral-950 text-neutral-300 flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <h2 className="text-lg mb-4">Something went wrong</h2>
+      <body style={{ background: "#0a0a0a", color: "#d4d4d4", display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
+        <div style={{ textAlign: "center" }}>
+          <h2 style={{ fontSize: "1.125rem", marginBottom: "1rem" }}>Something went wrong</h2>
           <button
             onClick={() => reset()}
-            className="text-sm font-mono text-neutral-500 hover:text-neutral-300"
+            style={{ fontSize: "0.875rem", color: "#a3a3a3", background: "none", border: "none", cursor: "pointer" }}
           >
             Try again
           </button>
