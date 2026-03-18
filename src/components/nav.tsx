@@ -46,7 +46,7 @@ export function Nav() {
             href="/consultation"
             className="ml-2 px-4 py-2 text-sm font-medium rounded-md bg-[var(--accent-blue)] text-white hover:bg-[var(--accent-blue-hover)] transition-colors"
           >
-            Get a Quote
+            Start Discovery
           </Link>
         </div>
 
@@ -96,7 +96,7 @@ export function Nav() {
               onClick={() => setMobileOpen(false)}
               className="mt-2 px-4 py-2 text-sm font-medium rounded-md bg-[var(--accent-blue)] text-white hover:bg-[var(--accent-blue-hover)] transition-colors text-center"
             >
-              Get a Quote
+              Start Discovery
             </Link>
           </div>
         </div>

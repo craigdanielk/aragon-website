@@ -1,10 +1,11 @@
-import { ConsultationForm } from "./consultation-form";
+import { Phase0Chat } from "./phase0-chat";
 
 export const metadata = {
-  title: "Consultation",
-  description: "Describe what you need built — get a scope assessment and quote.",
+  title: "Phase 0 Discovery",
+  description:
+    "Have a conversation with our AI consultant to understand your business challenges and get a tailored proposal.",
 };
 
 export default function ConsultationPage() {
-  return <ConsultationForm />;
+  return <Phase0Chat />;
 }
