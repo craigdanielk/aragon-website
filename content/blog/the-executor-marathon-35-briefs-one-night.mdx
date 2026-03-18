@@ -1,0 +1,66 @@
+---
+title: "The Night the Queue Never Emptied"
+date: "2026-03-19"
+slug: "the-executor-marathon-35-briefs-one-night"
+section: "blog"
+pillar: "build-log"
+excerpt: "35 BRIEFs in a single evening. What it looks like when an AI agent army runs at full capacity — and what breaks when it does."
+tags: ["agents-journey", "executor", "automation", "build-log", "sovereign"]
+status: "published"
+---
+
+There was a moment around 11pm when I checked the Supabase dashboard and saw the `briefs` table had grown by 35 rows since the afternoon.
+
+Not 35 tasks completed. 35 tasks *claimed*, worked, and closed — each one a distinct piece of software, infrastructure, or intelligence work. The executor had been running continuously for six hours.
+
+I didn't plan for that. Nobody plans for the queue to never empty.
+
+## How It Starts
+
+The executor is the part of the system that does the actual work. It polls a queue of BRIEFs — structured work orders in a specific format — claims them in batches of two, and executes each one using whatever tools are available. File edits, API calls, git commits, Supabase writes.
+
+The pattern is simple: claim, execute, close, repeat. The executor doesn't decide what to build. The planner handles that. The executor just ships.
+
+What I hadn't fully anticipated was what happens when the planner generates faster than the executor closes. After an aggressive evening of planning — identifying gaps, designing the next phase of the system, queuing work — the queue had depth. Real depth. Not three items but thirty.
+
+So the executor ran. And ran.
+
+## What 35 BRIEFs Actually Looks Like
+
+Some were small. A TypeScript implicit-any error in a Next.js pipeline route. A missing `import re` in the planner daemon. The kind of thing you'd fix in two minutes if you were doing it manually.
+
+Some were medium. Installing Playwright and verifying it could extract YouTube playlist data. Updating RECON's scoring algorithm to recognise seventeen new marketing skill patterns. Adding a rate limiter to the CI failure pipeline that was generating infinite duplicate BRIEFs.
+
+Some were genuinely complex. Building the Phase 0 URL intelligence layer for the ARAGON consultation tool — a new API route that fetches a client's website, extracts metadata with regex, detects their tech stack, calls Claude to analyse brand identity and competitors, and returns structured business intelligence before the consultation even starts.
+
+Each of those was a separate BRIEF. Each got claimed, executed, committed, deployed, and closed.
+
+## What Breaks at Scale
+
+Two things surfaced that I hadn't expected.
+
+The first was ghost BRIEFs. Some BRIEFs had been created with no payload — just a name and a status. Empty shells. The executor would claim them, find nothing to execute, and be stuck. The fix was adding a validator to the planner daemon that checks for meaningful content before any BRIEF reaches Supabase. Simple. But it required the problem to happen first.
+
+The second was the CI feedback loop. When code gets pushed, CI runs. When CI fails, a BRIEF gets auto-generated. But if the executor fixes the CI issue and pushes a fix, CI runs again, and if *that* fails, another BRIEF gets auto-generated. Ten CI BRIEFs for the same repository in one evening.
+
+The rate limiter — max one CI-fix BRIEF per repo per six hours — was itself generated as a BRIEF by the planner watching this happen. The system noticing its own failure mode and queuing a fix is probably the most interesting moment of the evening.
+
+## What the Executor Can't Do
+
+Not everything got shipped. Some BRIEFs hit walls the executor can't climb.
+
+The ARAGON website has Vercel SSO protection enabled. All the Phase 0 work is live in the codebase and pushed to GitHub — but nobody can see it yet because Vercel is gating access to the team only. Fixing that requires the Vercel dashboard. Requires a browser. Requires Craig.
+
+The `/news` slash command for the SAGE intelligence feed couldn't be written to `~/.claude/skills/` — the path is protected by a sensitive-file hook. Another gap queued for human attention.
+
+And the Aurelix CLI wrappers — four of them, cleanly documented, installed in the venv — all delegate to a `~/Aurelix_AG/` directory that doesn't exist. The skill documentation was built. The interfaces were built. The underlying engine wasn't. That's the next P1.
+
+## The Lesson That Emerged
+
+Depth of queue reveals the shape of your blockers.
+
+When there are only three items in the queue, you can pretend the bottleneck is execution speed. When there are thirty-five, you discover the real ceiling: it's the APPROVE gates. The things that require a browser, a credential, a human decision.
+
+The executor ran for six hours and shipped thirty-five items. The things that stopped it weren't missing capabilities. They were deliberate checkpoints — places where the system decided a human needed to stay in the loop.
+
+That's actually the design working correctly. But you don't see the shape of that design until the queue gets long enough.

@@ -1,0 +1,82 @@
+---
+title: "What If the AI Already Knew Your Business Before You Spoke?"
+date: "2026-03-19"
+slug: "phase0-url-intelligence-before-the-conversation"
+section: "blog"
+pillar: "pattern-library"
+excerpt: "Every consultation starts with basics. Website URL, what you sell, who your customers are. What if that part happened automatically — before the first message?"
+tags: ["agents-journey", "aragon", "phase0", "intelligence", "pattern-library"]
+status: "published"
+---
+
+Every sales conversation has a dead zone at the start.
+
+"Tell me about your business." "What do you sell?" "Who are your customers?" These aren't bad questions. They're necessary questions. But they're also questions the person answering has answered a hundred times, and the person asking could probably figure out from a five-minute website visit.
+
+The Phase 0 consultation — the pre-engagement discovery process that feeds the ARAGON system — had this dead zone. The first three exchanges were always basics. Background establishment. Context building. The conversation only got interesting around message four or five, once the fundamentals were covered.
+
+So I built a way to skip messages one through three.
+
+## The Architecture of Pre-Knowledge
+
+The URL intake screen is the first thing you see when you navigate to the consultation page. One input, one button. Enter your website. Click Analyse.
+
+While you wait, the system is doing several things simultaneously.
+
+First, it fetches your website. Not a screenshot — the raw HTML, retrieved server-side with a 15-second timeout and a polite user agent string. If the fetch fails (some sites block bots, some are slow), it falls back gracefully. No fetch, no problem; the consultation continues without pre-extracted intelligence.
+
+Second, it extracts structure. The title tag. The meta description. The H1. Open Graph properties. Social links. These are pattern-matched out of the HTML with regex — fast, reliable, no parsing library needed.
+
+Third, it detects your tech stack. Platform signals in the HTML — Shopify, WordPress, Webflow, Next.js, Vercel — leave fingerprints. Analytics tools leave script tags. Payment providers leave iframe patterns. Marketing platforms leave initialisation calls. The detector checks for all of these and returns a structured profile.
+
+Fourth, and most interesting: it hands the first 8,000 characters of your HTML to Claude.
+
+## What Claude Finds
+
+The LLM analysis call is where the capability jump happens.
+
+A regex can find your Shopify CDN domain. Claude can tell you that you're a mid-market DTC brand positioning against Glossier, targeting women 28-40 who distrust chemical ingredients, using a casual but authoritative voice, with three clear gaps in your current marketing: no email capture on the product page, no social proof above the fold, and no blog to drive organic discovery.
+
+That's what comes back from the extraction API. Not just facts — interpretation. Not just what's on the page, but what the page is trying to do and where it's falling short.
+
+The structured response includes: brand identity (name, tagline, colour palette, voice), business classification (industry, products, target audience, pricing model, company size), three likely competitors with positioning notes, and a two-sentence summary written specifically for use as consultation context.
+
+## The Injection
+
+When the extraction completes, the consultation doesn't just start — it starts with context already loaded.
+
+Every message you send to the Phase 0 assistant includes, invisibly, a block at the top of the system prompt that looks like this:
+
+```
+## BUSINESS INTELLIGENCE (pre-extracted from client website)
+{
+  "brand": { "name": "Champion Grip", "voice": "authoritative", ... },
+  "business": { "industry": "sporting goods", "targetAudience": "lawn bowls players", ... },
+  "seo": { "gaps": ["No email capture", "No blog", "No social proof"] },
+  "summary": "Champion Grip makes aerosol grip spray for lawn bowls..."
+}
+```
+
+The assistant already knows who you are. It knows what you sell. It knows where your current marketing is falling short. So instead of "Tell me about your business," the first message is something like: "Based on your site, I can see you're targeting the lawn bowls community — I want to understand whether your main growth challenge right now is acquisition or retention."
+
+Message one is already useful. Message three is already strategic.
+
+## The Skip
+
+There's a skip button. Deliberately.
+
+Not every client has a website. Not every client wants their site analysed before the conversation. The URL intake is optional — skip it and you land directly in the consultation, which works exactly as it did before.
+
+This matters because the upgrade to the consultation flow shouldn't feel like a wall. It should feel like an offer. Here's something that will make this conversation better. You don't have to take it.
+
+In practice, most people will take it. Entering a URL is much less work than answering three background questions. But the skip exists because forcing intelligence gathering on someone who came for a conversation is the wrong tradeoff.
+
+## The Pattern
+
+URL-first intelligence is a pattern that applies beyond consultations.
+
+Any AI conversation that starts with background establishment can potentially be improved by pre-extracting that background automatically. Support tickets. Sales calls. Technical interviews. Anywhere the first several exchanges are context-building rather than problem-solving.
+
+The technique is the same: take whatever identifier you have (URL, email domain, company name, LinkedIn handle), extract whatever you can automatically, inject the structured result as context before the conversation begins.
+
+The conversation skips the basics because the basics already happened — quietly, before anyone said hello.

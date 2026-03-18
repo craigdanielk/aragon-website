@@ -1,0 +1,66 @@
+---
+title: "Building the Agent That Reads So You Don't Have To"
+date: "2026-03-19"
+slug: "how-sage-became-a-research-agent"
+section: "blog"
+pillar: "build-log"
+excerpt: "SAGE started as a URL fetcher. It became an independent research engine that ingests social content, transcribes video, and now monitors the entire AI news landscape daily."
+tags: ["agents-journey", "sage", "research", "automation", "architecture"]
+status: "published"
+---
+
+The original SAGE spec said: *fetch URLs and extract text*.
+
+That's a fine spec for a utility. It is not a spec for an agent. The difference became clear about three weeks into the build, when I realised I was manually checking Anthropic's blog every few days to see if anything had changed that would affect how I was building.
+
+The problem wasn't lack of information. It was that I was doing the reading myself. That's what SAGE is for.
+
+## What SAGE Actually Is
+
+SAGE — Semantic Analysis and Guided Extraction, if you're being formal about it — is the system's research layer. Everything the other agents need to know that isn't in the codebase, SAGE fetches, processes, and stores.
+
+Early versions were primitive. Give SAGE a URL, get back extracted text. Give it a YouTube video, get back a transcript via Whisper. Useful, but reactive. SAGE only knew things when you explicitly asked it to look something up.
+
+The architecture that emerged over the next iteration is fundamentally different. SAGE now operates in two modes.
+
+**Mode 1: Research specs.** A structured YAML-like entity in RAG describes a research topic, its sources, its output format, and when to run it. SAGE processes these specs on a schedule, stores results as named entities, and makes them available to the rest of the system. No manual trigger needed.
+
+**Mode 2: Polling agent.** SAGE runs a daemon that polls a `sage_tasks` table in Supabase. Other agents can queue tasks — transcribe this video, ingest this social profile, research this topic — and SAGE processes them in order, storing results back in RAG.
+
+The shift from Mode 1 thinking to Mode 2 thinking was the architectural breakthrough. Instead of "SAGE fetches things when asked," the model became "SAGE runs continuously and processes whatever gets queued."
+
+## The Social Ingestion Detour
+
+The most interesting failure in the SAGE build was the social ingestion layer.
+
+The goal was straightforward: ingest Craig's Instagram, LinkedIn, and YouTube content, extract brand voice patterns, and use that to inform how ARAGON generates content. If SAGE knows how Craig writes on LinkedIn, ARAGON can write LinkedIn posts that sound like Craig rather than like ChatGPT.
+
+What I built was technically impressive and practically blocked.
+
+The Instagram ingestion uses Playwright to navigate the saved posts view. The LinkedIn ingestion pulls from the activity feed. The YouTube ingestion combines yt-dlp for downloads with Whisper for transcription. All of this works when you run it locally with the right cookies in place.
+
+It doesn't work in a CI environment. It doesn't work when the session expires. It doesn't work when Instagram decides to show a captcha.
+
+So the social ingestion tasks are queued. They're waiting for credentials, for a stable auth session, for someone to sit down and properly set up the cookie files. The work is there. The integration is there. The social data isn't, because getting it requires ongoing human maintenance that nobody has done yet.
+
+That's fine. SAGE was designed to tolerate this. The tasks sit in `sage_tasks` with status `QUEUED` until something processes them. Nothing breaks. The rest of the system continues working.
+
+## The News Intelligence Layer
+
+What did ship, on the executor's most recent marathon, was something more interesting: SAGE as a daily news intelligence feed.
+
+The configuration is simple. A `sage_task` with `task_type=research` and `source=ai-news-daily` contains a list of sources — Anthropic's blog, OpenAI, Hacker News, Vercel, Supabase, a16z — and a set of web search queries. When SAGE processes this task, it fetches the sources, runs the searches, uses Claude to categorise and summarise what it finds, and stores the result as a dated entity: `content::ai-news-digest::2026-03-19`.
+
+ARAGON can then consume that entity. The blog series "What happened in AI this week" writes itself from the digest. RECON can scan it for new tools that signal emerging demand.
+
+The loop is: SAGE reads the internet, stores structured intelligence, and the rest of the system consumes it. Nobody has to sit down and brief the agents on what's happening in the world.
+
+## What's Left
+
+The polling daemon isn't running continuously yet. The research task is queued. The first digest hasn't been generated. That's the remaining work — running `python -m sage.polling --loop` as a persistent launchd service.
+
+The architecture is sound. The code is there. What's missing is the on switch.
+
+That's a pattern I keep seeing in this build: components that are fully designed, fully implemented, and sitting at 95% completion waiting for one operational step. The last 5% is almost always human: start the daemon, provide the credentials, flip the switch in the dashboard.
+
+SAGE reads so you don't have to. It just needs someone to turn it on.

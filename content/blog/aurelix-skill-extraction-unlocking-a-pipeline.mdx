@@ -1,0 +1,72 @@
+---
+title: "The Website Builder That Almost Worked"
+date: "2026-03-19"
+slug: "aurelix-skill-extraction-unlocking-a-pipeline"
+section: "blog"
+pillar: "build-log"
+excerpt: "Extracting eight skills from the Aurelix codebase took a day. The CLI wrappers were clean. The underlying engine didn't exist. A story about the gap between documented capability and deployed capability."
+tags: ["agents-journey", "aurelix", "skills", "pipeline", "build-log"]
+status: "published"
+---
+
+The Aurelix codebase was sitting at roughly 40,000 lines of TypeScript when I started the extraction.
+
+Inside it: a website builder, a product importer, a URL migration toolkit, and a Shopify store analyser. Four distinct tools. Individually impressive. Collectively, the most complete e-commerce pipeline I'd ever seen in a single repo.
+
+The task was to extract each tool as a standalone skill — document what it does, build a CLI wrapper, register it in the system so other agents could invoke it. An afternoon's work, maybe.
+
+It took longer than that. And it revealed something about the difference between documented capability and deployed capability that I'm still thinking about.
+
+## What Extraction Actually Means
+
+Skill extraction isn't porting code. It's documentation work with a very specific output format.
+
+Each skill needs a `SKILL.md` that describes what the skill does, what it requires as input, what it produces as output, which tools it needs access to, and what errors it can fail with. The document is the spec. Another agent reading it should be able to invoke the skill correctly without reading the underlying code.
+
+For the Aurelix tools, the `SKILL.md` files came together quickly. The web builder takes a project brief and an industry preset, assembles a Next.js storefront from a library of 25 section archetypes, and optionally deploys to Vercel. That's the story. Eight sentences as a skill description, twelve pages as a full spec.
+
+The industry presets were the interesting part. Forty presets, each encoding style dimensions: animation intensity, typography hierarchy, colour palette logic, spacing scale, section sequence preferences. A `health-wellness` preset produces a different site than a `construction-trades` preset not because you tell it what to build differently, but because the preset carries all those preferences already. You say "lawn bowling equipment" and the system figures out that means outdoors, performance-oriented, community-focused — and selects archetypes accordingly.
+
+## The CLI Wrappers
+
+Once the SKILL.md files existed, the CLI wrappers were straightforward. Four packages: `cli-anything-aurelix-calculator`, `cli-anything-aurelix-web-builder`, `cli-anything-aurelix-importer`, `cli-anything-aurelix-mapper`. Each installs as a command in the scripts venv. Each exposes the interface documented in the SKILL.md.
+
+```bash
+cli-anything-aurelix-web-builder build champion-grip \
+  --preset sporting-goods \
+  --deploy
+```
+
+That's the interface. That's what you'd type to build the Champion Grip website from scratch.
+
+The problem surfaced when I actually ran it.
+
+```
+ERROR: Aurelix_AG not found at /Users/craigkunte/Developer/GitHub/Personal/Aurelix_AG
+```
+
+Every CLI wrapper is a proxy. It constructs the right command, assembles the right arguments, then hands off to an `orchestrate.py` script that lives in the actual Aurelix_AG monorepo. Which doesn't exist.
+
+The documentation was built. The interfaces were built. The engine wasn't.
+
+## The Honest Accounting
+
+This is a pattern that shows up in ambitious codebases. The top layer — the interfaces, the documentation, the skill descriptions — gets built in a burst of design energy. Then the work required to make those interfaces actually connect to real implementations turns out to be larger than expected.
+
+The web builder in particular: it's not just a script that writes HTML. It's an agent that uses Claude to generate section-by-section React components, applying the variant logic from the archetypes library to produce real, production-quality code. The `orchestrate.py` that the CLI wrapper expects to delegate to is itself a fairly sophisticated piece of software.
+
+So the Aurelix skill extraction BRIEF got closed as complete — because the documentation and interfaces were complete — and a follow-up BRIEF got queued for the actual implementation.
+
+That feels uncomfortable if you're tracking completion percentages. It feels accurate if you're tracking what's actually true about the system's state.
+
+## What's Next
+
+The Champion Grip website is the target. First demo in the pipeline toward an outreach gate that requires five real demos before the system starts finding leads.
+
+The web builder bootstrap is in the queue. It's a build task, not a documentation task. When it's done, the CLI wrapper that currently throws an error will actually produce a website.
+
+That website will be wrong on the first attempt. The archetypes won't map perfectly to what a lawn bowling grip product needs. The preset will be close but not right. There will be iterations.
+
+But it will exist. And existing is the only thing that matters at Demo 1.
+
+The eight months between "the skill is documented" and "the skill produces an output" is where most AI automation projects get lost. The documentation is fast. The shipping is the hard part.

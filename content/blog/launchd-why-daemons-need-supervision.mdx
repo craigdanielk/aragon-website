@@ -1,0 +1,103 @@
+---
+title: "The Process That Keeps Dying"
+date: "2026-03-19"
+slug: "launchd-why-daemons-need-supervision"
+section: "blog"
+pillar: "tool-autopsy"
+excerpt: "We kept starting the planner daemon manually. It kept stopping. Then we learned about launchd — and why OS-level process supervision is the correct solution, not a workaround."
+tags: ["agents-journey", "infrastructure", "launchd", "daemons", "macos"]
+status: "published"
+---
+
+The planner daemon was supposed to run continuously.
+
+It would wake up every fifteen minutes, scan for new gaps in RAG, check for pending BRIEFs, run its planning cycle, and sleep again. Background work. Infrastructure work. The kind of process you start once and forget about.
+
+Except it kept stopping.
+
+Sometimes a Python exception would bubble up through an unhandled error path and kill the process. Sometimes the laptop would sleep and the process wouldn't wake cleanly. Sometimes — honestly — I just closed the terminal window it was running in.
+
+Every time it stopped, the planning loop stopped. BRIEFs stopped flowing. The executor ran through its queue and went idle because nobody was queuing new work. The system froze, silently, and nobody noticed until I checked the dashboard and saw that the planner hadn't run in six hours.
+
+## The Wrong Solutions
+
+I tried several things that didn't work.
+
+**A shell script with a retry loop.** `while true; do python planner.py; sleep 5; done`. This works until it doesn't. If the laptop sleeps, the shell script sleeps. If you close the terminal, the shell script dies. If there's a startup error, the retry loop retries forever at five-second intervals, spamming logs and burning CPU.
+
+**A nohup background process.** `nohup python planner.py &`. Survives terminal closure. Doesn't survive a reboot. Has no visibility into whether it's running. No logs. No way to stop it gracefully. `kill -9` and hope.
+
+**tmux.** A persistent terminal session in tmux means the process runs as long as the tmux session runs. Better. But tmux sessions die when the machine reboots. And you still have no real process management — no auto-restart, no resource limits, no log rotation.
+
+All of these are ways of keeping a process running that wasn't designed to be kept running. They're workarounds around the absence of proper process supervision.
+
+## What launchd Actually Is
+
+macOS has had a proper process supervisor since OS X 10.4. It's called launchd, and it replaces everything: cron, init, inetd, mach_init. When your Mac boots, launchd is process 1. Everything else is launched by or from launchd.
+
+A launchd service is defined by a property list — a `.plist` XML file that lives in `~/Library/LaunchAgents/` for user services. The plist specifies: what binary to run, what arguments to pass, what working directory to use, where to write stdout and stderr, and crucially, whether to keep the process alive.
+
+`KeepAlive: true` is the line that changes everything.
+
+With that flag, launchd watches the process. If it exits — for any reason — launchd restarts it. If it crashes, launchd restarts it. If the machine sleeps and wakes, launchd checks if the process is running and starts it if not. If you call `launchctl unload` and then `launchctl load`, launchd starts it fresh with clean state.
+
+You're not fighting the operating system anymore. You're using the operating system.
+
+## The Planner Plist
+
+The planner daemon's plist is about thirty lines:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" ...>
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.northstar.planner</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/path/to/.venv/bin/python</string>
+    <string>-m</string>
+    <string>daemon.planner_daemon</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/path/to/scripts</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PYTHONPATH</key>
+    <string>/path/to/scripts</string>
+  </dict>
+  <key>StandardOutPath</key>
+  <string>/path/to/daemon/logs/planner.log</string>
+  <key>StandardErrorPath</key>
+  <string>/path/to/daemon/logs/planner_error.log</string>
+  <key>KeepAlive</key>
+  <true/>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>30</integer>
+</dict>
+</plist>
+```
+
+`RunAtLoad: true` means it starts when you load the plist. `ThrottleInterval: 30` means if the process crashes, launchd waits 30 seconds before restarting it — preventing a rapid crash loop from hammering the system.
+
+Load it once:
+```bash
+launchctl load ~/Library/LaunchAgents/com.northstar.planner.plist
+```
+
+Now the planner runs. It survives sleep. It survives reboots. It restarts automatically if it crashes. You stop thinking about whether it's running and start assuming it's running.
+
+## The Deeper Lesson
+
+The reason we reach for `nohup` and `tmux` instead of launchd isn't capability — launchd has been on every Mac for twenty years. It's friction. Writing a plist is more work than appending `&` to a shell command.
+
+But the work you avoid by using `nohup` is ten minutes of configuration. The work you create by using `nohup` is every debugging session spent figuring out why the daemon isn't running, every system freeze caused by an unmanaged process dying silently, every manual restart that interrupts something else.
+
+The correct investment is the upfront ten minutes. You pay it once. launchd pays it back every morning when you open your laptop and all three daemons are running, have been running all night, and you didn't have to touch anything.
+
+Infrastructure work has this property in general: the overhead looks large upfront and invisible in hindsight. The daemon you set up properly in January is the daemon you don't think about in July. The daemon you managed with tmux in January is the daemon you're debugging at midnight in July.
+
+Use the operating system. It already knows how to do this.
