@@ -9,7 +9,7 @@ interface Message {
 
 export async function POST(request: Request) {
   try {
-    const body: { messages: Message[] } = await request.json();
+    const body: { messages: Message[]; businessContext?: Record<string, unknown> } = await request.json();
 
     if (!body.messages || !Array.isArray(body.messages) || body.messages.length === 0) {
       return new Response(JSON.stringify({ error: "Messages required" }), {
@@ -27,6 +27,10 @@ export async function POST(request: Request) {
       );
     }
 
+    const systemPrompt = body.businessContext
+      ? `## BUSINESS INTELLIGENCE (pre-extracted from client website)\n${JSON.stringify(body.businessContext, null, 2)}\n\n---\n\n${PHASE0_SYSTEM_PROMPT}`
+      : PHASE0_SYSTEM_PROMPT;
+
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -37,7 +41,7 @@ export async function POST(request: Request) {
       body: JSON.stringify({
         model: "claude-sonnet-4-20250514",
         max_tokens: 2048,
-        system: PHASE0_SYSTEM_PROMPT,
+        system: systemPrompt,
         stream: true,
         messages: body.messages,
       }),

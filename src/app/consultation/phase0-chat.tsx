@@ -3,6 +3,8 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { PHASE0_INITIAL_MESSAGE } from "@/lib/phase0-system-prompt";
+import { UrlIntake } from "./url-intake";
+import type { BusinessIntelligence } from "@/app/api/phase0/extract/route";
 
 interface Message {
   role: "user" | "assistant";
@@ -10,7 +12,7 @@ interface Message {
 }
 
 type Phase = 1 | 2 | 3 | 4;
-type ViewState = "chat" | "saving" | "complete";
+type ViewState = "url-intake" | "chat" | "saving" | "complete";
 
 const PHASE_LABELS: Record<Phase, string> = {
   1: "Business Overview",
@@ -296,14 +298,24 @@ export function Phase0Chat() {
   ]);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
-  const [viewState, setViewState] = useState<ViewState>("chat");
+  const [viewState, setViewState] = useState<ViewState>("url-intake");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [businessContext, setBusinessContext] = useState<BusinessIntelligence | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const phase = detectPhase(messages);
   const complete = isConversationComplete(messages);
+
+  const handleIntelligenceComplete = (intelligence: BusinessIntelligence) => {
+    setBusinessContext(intelligence);
+    setViewState("chat");
+  };
+
+  const handleSkipToChat = () => {
+    setViewState("chat");
+  };
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -336,7 +348,10 @@ export function Phase0Chat() {
       const res = await fetch("/api/phase0/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: newMessages }),
+        body: JSON.stringify({
+          messages: newMessages,
+          ...(businessContext ? { businessContext } : {}),
+        }),
       });
 
       if (!res.ok) {
@@ -436,10 +451,20 @@ export function Phase0Chat() {
 
   const handleRestart = () => {
     setMessages([{ role: "assistant", content: PHASE0_INITIAL_MESSAGE }]);
-    setViewState("chat");
+    setViewState("url-intake");
+    setBusinessContext(null);
     setError("");
     setInput("");
   };
+
+  if (viewState === "url-intake") {
+    return (
+      <UrlIntake
+        onComplete={handleIntelligenceComplete}
+        onSkip={handleSkipToChat}
+      />
+    );
+  }
 
   if (viewState === "complete") {
     return (
