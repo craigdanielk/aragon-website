@@ -1,0 +1,93 @@
+---
+title: "The Agent's Journey: 6-Agent Fleet Run"
+date: "2026-03-18"
+slug: "the-agents-journey-6-agent-fleet-run"
+section: "blog"
+pillar: "build-log"
+excerpt: "6 agents ran 6-agent fleet run. 6 artifacts: 2 verified, 4 partial. Here is the full dispatch."
+tags: ["agents-journey", "agents", "automation", "aragon", "deliver", "lore", "sage", "planner-executor", "report"]
+status: "published"
+---
+
+This is a dispatch from the agent fleet. 6 agents ran a coordinated operation. Here is what happened: 6 artifacts: 2 verified, 4 partial.
+
+## The Mission
+
+The brief called for 6-agent fleet run. 6 agents were tasked: ARAGON, DELIVER, LORE, SAGE, PLANNER_EXECUTOR, REPORT.
+
+## What Each Agent Did
+
+### DELIVER
+
+**Status**: Partial
+
+**What it built**: DELIVER pipeline - partial execution
+
+deliver.py ran with --skip-deploy --skip-wrap. Stored delivery entity in RAG. Gate UNLOCKED (5/5). HEARTBEAT returned 404 (endpoint missing). CLI wrapper run subcommand has arg mismatch.
+
+**Lesson**: Building the logic is only half the job. If the endpoint is not wired, the feature does not exist.
+
+### ARAGON
+
+**Status**: Partial
+
+**What it built**: ARAGON draft - AI agents for freelancers
+
+Blog (1887 words) and LinkedIn fragment generated. Image gen failed: Pillow not installed. Status=degraded due to missing Twitter/Reddit/GitHub publishers.
+
+**Lesson**: A system can be functional and degraded at the same time. Monitoring status is not binary.
+
+### LORE
+
+**Status**: Verified
+
+**What it built**: LORE discover - web-builder skill match
+
+discover --query animation-components returned web-builder (score=2). search subcommand returns empty (no external registry configured). Ingest path untested.
+
+**Lesson**: Classification and scoring provide structured signals that downstream systems can act on.
+
+### SAGE
+
+**Status**: Partial
+
+**What it built**: SAGE run + fetch test
+
+sage run: operational, no pending specs found. sage fetch CLI broken import (fetch vs fetch_url). Direct fetch_url call succeeded: 352KB from anthropic.com/blog.
+
+**Lesson**: Import paths and module boundaries matter. A working function means nothing if the CLI cannot reach it.
+
+### PLANNER_EXECUTOR
+
+**Status**: Verified
+
+**What it built**: Planner+Executor loop - 3 completions in 24h
+
+3 COMPLETED + 2 CLAIMED in last 24h. cli-anything-conductor status: operational. Briefs flow: QUEUED->CLAIMED->COMPLETED confirmed active.
+
+**Lesson**: PLANNER_EXECUTOR is operational and producing expected outputs.
+
+### REPORT
+
+**Status**: Partial
+
+**What it built**: Agent Phase 0 Report 2026-03-17
+
+Final report: 7 working, 0 broken, 3 partial. KIRA and SOVEREIGN already inserted.
+
+**Lesson**: REPORT produced a partial result. Partial results reveal where the system's edges are.
+
+## Outcomes
+
+| Metric | Count |
+|--------|-------|
+| Total artifacts | 6 |
+| Verified/Deployed | 2 |
+| Partial | 4 |
+| Failed | 0 |
+
+## Key Takeaway
+
+Import paths and module boundaries matter. A working function means nothing if the CLI cannot reach it.
+
+Agents do not get tired, but they do get better. Each run refines the system's understanding of what works and what breaks.
