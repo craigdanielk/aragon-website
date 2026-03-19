@@ -59,7 +59,7 @@ body {
 .prose {
   --tw-prose-body: #a3a3a3;
   --tw-prose-headings: #e5e5e5;
-  --tw-prose-links: #e5e5e5;
+  --tw-prose-links: var(--accent-green);
   --tw-prose-bold: #e5e5e5;
   --tw-prose-code: #d4d4d4;
   --tw-prose-pre-bg: #171717;
@@ -86,19 +86,21 @@ body {
 }
 
 .prose a {
-  text-decoration-color: #525252;
+  color: var(--accent-green);
+  text-decoration-color: rgba(0, 255, 65, 0.3);
   text-underline-offset: 3px;
+  transition: text-decoration-color 0.15s ease;
 }
 
 .prose a:hover {
-  text-decoration-color: #a3a3a3;
+  text-decoration-color: var(--accent-green);
 }
 
 /* Light mode prose */
 :root:not(.dark) .prose {
   --tw-prose-body: #404040;
   --tw-prose-headings: #171717;
-  --tw-prose-links: #171717;
+  --tw-prose-links: var(--accent-green);
   --tw-prose-bold: #171717;
   --tw-prose-code: #262626;
   --tw-prose-pre-bg: #f5f5f5;
