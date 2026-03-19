@@ -1,5 +1,6 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { remarkAutoLink } from "@/lib/remark-auto-link";
 
 interface Props {
   content: string;
@@ -7,7 +8,7 @@ interface Props {
 
 export function PostRenderer({ content }: Props) {
   return (
-    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+    <ReactMarkdown remarkPlugins={[remarkGfm, remarkAutoLink]}>
       {content}
     </ReactMarkdown>
   );
