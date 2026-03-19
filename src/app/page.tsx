@@ -1,50 +1,29 @@
-import { getBlogPosts, getConversationPosts } from "@/lib/content";
-import { PostCard } from "@/components/post-card";
+import { getBlogPosts } from "@/lib/content";
+import { workflows } from "@/lib/workflows";
+import { agents } from "@/lib/agents";
 import { HeroSection } from "@/components/sections/hero";
-import { MetricsStrip } from "@/components/sections/metrics";
-import { ContentPillars } from "@/components/sections/content-pillars";
-import { BuildsTeaser } from "@/components/sections/builds-teaser";
+import { LiveStats } from "@/components/sections/live-stats";
+import { Capabilities } from "@/components/sections/capabilities";
+import { HowItWorks } from "@/components/sections/how-it-works";
+import { FeaturedWorkflows } from "@/components/sections/featured-workflows";
+import { AgentFleet } from "@/components/sections/agent-fleet";
+import { LatestBlog } from "@/components/sections/latest-blog";
 import { CtaSection } from "@/components/sections/cta";
 
 export default function Home() {
-  const blogPosts = getBlogPosts().slice(0, 5);
-  const conversations = getConversationPosts().slice(0, 3);
+  const blogPosts = getBlogPosts()
+    .slice(0, 3)
+    .map((p) => p.meta);
 
   return (
     <div>
       <HeroSection />
-      <MetricsStrip />
-
-      <div className="max-w-5xl mx-auto px-6 py-20">
-        {blogPosts.length > 0 && (
-          <section className="mb-20">
-            <h2 className="text-3xl font-semibold text-neutral-100 mb-8">
-              Recent Posts
-            </h2>
-            <div className="space-y-1">
-              {blogPosts.map((post) => (
-                <PostCard key={post.meta.slug} post={post.meta} />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {conversations.length > 0 && (
-          <section className="mb-20">
-            <h2 className="text-3xl font-semibold text-neutral-100 mb-8">
-              Conversations with Claude
-            </h2>
-            <div className="space-y-1">
-              {conversations.map((post) => (
-                <PostCard key={post.meta.slug} post={post.meta} />
-              ))}
-            </div>
-          </section>
-        )}
-      </div>
-
-      <ContentPillars />
-      <BuildsTeaser />
+      <LiveStats />
+      <Capabilities />
+      <HowItWorks />
+      <FeaturedWorkflows workflows={workflows} />
+      <AgentFleet agents={agents} />
+      <LatestBlog posts={blogPosts} />
       <CtaSection />
     </div>
   );
