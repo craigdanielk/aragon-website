@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { BusinessIntelligence } from "@/app/api/phase0/extract/route";
+import { findClientByDomain } from "@/lib/phase0-clients";
 
 const EXTRACTION_STEPS = [
   "Fetching your website...",
@@ -26,6 +27,13 @@ export function UrlIntake({ onComplete, onSkip }: Props) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!url.trim()) return;
+
+    // Check for a preconfigured client first — skip API extraction entirely
+    const preconfigured = findClientByDomain(url.trim());
+    if (preconfigured) {
+      onComplete(preconfigured.intelligence as BusinessIntelligence);
+      return;
+    }
 
     setStatus("extracting");
     setStepIndex(0);
