@@ -10,6 +10,16 @@ export interface PortfolioRepo {
 
 export const portfolioRepos: PortfolioRepo[] = [
   {
+    name: "Champion Grip",
+    description:
+      "E-commerce product site for lawn bowling grips. 17,500+ units sold globally. Full product catalog with variant selection, responsive design, and conversion-optimised layout.",
+    category: "web-platform",
+    highlights: ["17,500+ units sold", "Product catalog", "Conversion-optimised"],
+    techStack: ["Next.js 16", "React 19", "Tailwind CSS", "Vercel"],
+    url: "https://champion-grip-demo.vercel.app",
+    github: "https://github.com/craigdanielk/champion-grip-demo",
+  },
+  {
     name: "ARAGON Engine",
     description:
       "Automated content generation pipeline for multi-platform publishing. Harvests topics from real development work, synthesises posts via AI, and distributes across 25+ channels.",
@@ -25,7 +35,7 @@ export const portfolioRepos: PortfolioRepo[] = [
     category: "web-platform",
     highlights: ["GEO-optimised", "MDX blog engine", "Consultation booking"],
     techStack: ["Next.js 16", "React 19", "Tailwind CSS 4", "Vercel"],
-    url: "https://aragon.craigkunte.com",
+    url: "https://aragon-website-bice.vercel.app",
     github: "https://github.com/craigdanielk/aragon-website",
   },
   {
@@ -35,7 +45,7 @@ export const portfolioRepos: PortfolioRepo[] = [
     category: "ai-infrastructure",
     highlights: ["Sprint planning", "Cross-agent coordination", "Real-time status"],
     techStack: ["Next.js", "TypeScript", "Supabase", "Vercel"],
-    url: "https://sovereign-dashboard.vercel.app",
+    url: "https://sovereign-dashboard-info-94818341s-projects.vercel.app",
     github: "https://github.com/craigdanielk/sovereign-dashboard",
   },
   {
