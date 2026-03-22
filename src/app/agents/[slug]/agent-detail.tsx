@@ -4,6 +4,7 @@ import Link from "next/link";
 import { RevealOnScroll } from "@/components/motion";
 import { getAgentByName } from "@/lib/agents";
 import type { Agent } from "@/lib/agents";
+import { getPublicSupabaseClient } from "@/lib/supabase-public";
 import { useEffect, useState } from "react";
 
 function AgentIcon({ name, color }: { name: string; color: string }) {
@@ -87,23 +88,18 @@ function RecentArtifacts({ agentName }: { agentName: string }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const SUPABASE_URL = "https://wwimngjmnuuitowujnif.supabase.co";
-    const SUPABASE_KEY = "sb_publishable_htgX411WISV2i6fzvRw9-w_V-q9Nn4H";
-
     async function fetchArtifacts() {
       try {
-        const res = await fetch(
-          `${SUPABASE_URL}/rest/v1/artifacts?agent=eq.${agentName}&order=created_at.desc&limit=5&select=id,title,created_at,brief_id`,
-          {
-            headers: {
-              apikey: SUPABASE_KEY,
-              Authorization: `Bearer ${SUPABASE_KEY}`,
-            },
-          }
-        );
-        if (res.ok) {
-          const data = await res.json();
-          setPosts(data);
+        const supabase = getPublicSupabaseClient();
+        const { data, error } = await supabase
+          .from("artifacts")
+          .select("id,title,created_at,brief_id")
+          .eq("agent", agentName)
+          .order("created_at", { ascending: false })
+          .limit(5);
+
+        if (!error && data) {
+          setPosts(data as ArtifactPost[]);
         }
       } catch {
         // Silently fail — artifacts are supplemental

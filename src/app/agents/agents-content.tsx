@@ -72,7 +72,7 @@ export function AgentsContent({ agents }: { agents: Agent[] }) {
           Agents
         </h1>
         <p className="text-lg text-neutral-400 mb-6 max-w-2xl">
-          The 14 AI agents powering the ARAGON system. Each agent has a defined
+          The {agents.length} AI agents powering the ARAGON system. Each agent has a defined
           role, capabilities, and connections to other agents. Together they form
           a self-coordinating workforce.
         </p>

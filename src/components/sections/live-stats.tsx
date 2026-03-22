@@ -27,13 +27,13 @@ async function fetchGlobalStats(): Promise<GlobalStats> {
     return {
       workflowsExecuted: briefsResult.count ?? 0,
       artifactsProduced: artifactsResult.count ?? 0,
-      agentsOperational: 14,
+      agentsOperational: 15,
     };
   } catch {
     return {
       workflowsExecuted: 0,
       artifactsProduced: 0,
-      agentsOperational: 14,
+      agentsOperational: 15,
     };
   }
 }

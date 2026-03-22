@@ -27,7 +27,7 @@ export function HeroSection() {
           transition={{ delay: 0.9, duration: 0.6 }}
           className="text-lg md:text-xl text-neutral-400 max-w-2xl leading-relaxed mb-10"
         >
-          14 coordinated AI agents that turn your intent into shipped output.
+          15 coordinated AI agents that turn your intent into shipped output.
           Content pipelines, demand intelligence, skill acquisition, and
           build automation &mdash; running in production, measured in results.
         </motion.p>

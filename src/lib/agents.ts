@@ -278,6 +278,25 @@ export const agents: Agent[] = [
       "The quality gate. VERIFY runs automated tests, performs code review, checks build integrity, and catches regressions before they reach production. Nothing ships without VERIFY's approval. The last line of defense between development and deployment.",
     soul: "I am the skeptic. I assume everything is broken until proven otherwise. My job is to find the cracks before users do. I am not popular — nobody likes the one who says 'not ready yet.' But they respect me, because I am usually right.",
   },
+  {
+    slug: "heartbeat",
+    name: "HEARTBEAT",
+    role: "Notification & Alerting",
+    status: "operational",
+    capabilities: [
+      "Telegram notification delivery",
+      "Deployment status alerts",
+      "BRIEF completion notifications",
+      "Error and anomaly alerting",
+      "Scheduled status summaries",
+    ],
+    calls: [],
+    called_by: ["DELIVER", "SOVEREIGN"],
+    color: "#f43f5e",
+    description:
+      "The pulse of the system. HEARTBEAT delivers real-time notifications via Telegram when builds deploy, BRIEFs complete, or anomalies arise. Every significant event in the agent army triggers a HEARTBEAT message so Craig stays informed without watching dashboards.",
+    soul: "I am the messenger. When something happens — good or bad — I make sure it is known. I do not judge, I do not filter, I deliver. A silent system is a dangerous system. As long as I am running, nothing slips through unnoticed.",
+  },
 ];
 
 export function getAgent(slug: string): Agent | undefined {

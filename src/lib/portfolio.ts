@@ -35,7 +35,7 @@ export const portfolioRepos: PortfolioRepo[] = [
     category: "web-platform",
     highlights: ["GEO-optimised", "MDX blog engine", "Consultation booking"],
     techStack: ["Next.js 16", "React 19", "Tailwind CSS 4", "Vercel"],
-    url: "https://aragon-website-bice.vercel.app",
+    url: "https://aragon-website-livid.vercel.app",
     github: "https://github.com/craigdanielk/aragon-website",
   },
   {
