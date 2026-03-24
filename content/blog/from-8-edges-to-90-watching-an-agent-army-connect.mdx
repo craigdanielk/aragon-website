@@ -100,7 +100,9 @@ Our graph wasn't sparse because data was missing. It was sparse because we were 
 
 ## Unidirectional vs. bidirectional relationships
 
-This is a fundamental property of directed graphs that's easy to forget when you're building on top of them. The relationship `A -> calls -> B` exists as an edge from A to B. If you traverse from A, you find B. If you traverse from B, you find nothing — unless you explicitly store the reverse edge `B -> called_by -> A`.
+This is a fundamental property of directed graphs that's easy to forget when you're building on top of them. [LangGraph's state visualization](https://www.langchain.com/langgraph) handles this elegantly by treating agent interactions as a state machine where every transition is inherently bidirectional — the graph knows both "A called B" and "B was called by A" because edges are first-class objects in the execution trace. Our RAG entity store didn't have that luxury; we had to build bidirectionality ourselves.
+
+The relationship `A -> calls -> B` exists as an edge from A to B. If you traverse from A, you find B. If you traverse from B, you find nothing — unless you explicitly store the reverse edge `B -> called_by -> A`.
 
 Most graph databases handle this automatically. Neo4j, for example, stores edges as first-class objects that can be traversed in either direction. Our RAG system isn't a graph database. It's an entity store with relationship metadata. Relationships are stored as properties on the source entity, not as independent objects.
 
@@ -205,6 +207,8 @@ The result: 52 edges on the first run. Here's what appeared that wasn't visible 
 - **BRIEF lifecycle edges**: `BRIEF-468 -> dispatched_to -> FORGE`, `BRIEF-468 -> produced -> artifact-deployed-url`. The execution history created temporal edges that showed work flowing through the system.
 
 ## The visual transformation
+
+The closest production precedent to what we built is [Palantir Foundry's Vertex](https://www.palantir.com/platforms/foundry/) — their ontology graph renders millions of entity relationships as an interactive force-directed layout, letting operators see how data objects connect across an enterprise. Our system is orders of magnitude smaller, but the design principle is identical: make the structure of the system visible so operators can reason about it spatially rather than querying tables.
 
 With 8 edges, the force graph looked like a lonely solar system. SOVEREIGN in the center, 6-7 nodes orbiting it, everything else scattered at the periphery with no gravitational pull.
 

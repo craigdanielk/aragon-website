@@ -1,0 +1,81 @@
+{
+  "version": "1.0",
+  "updated": "2026-03-24",
+  "streams": [
+    {
+      "id": "build_log",
+      "label": "Build Log",
+      "voice": "first-person narrative, raw and honest, shows the work",
+      "frequency": "2/week",
+      "pillar": "build-log",
+      "example_titles": [
+        "SOVEREIGN Dispatch Log: Building Myself Overnight",
+        "The Executor Marathon: 35 BRIEFs One Night",
+        "How SAGE Became a Research Agent"
+      ],
+      "citations_required": false
+    },
+    {
+      "id": "pattern_library",
+      "label": "Pattern Library",
+      "voice": "technical, problem-solution structure, reusable insights",
+      "frequency": "1/week",
+      "pillar": "pattern-library",
+      "example_titles": [
+        "Why Our AI Agents Kept Lying About Completing Tasks",
+        "From 8 Edges to 90: Watching an Agent Army Connect",
+        "Phase 0: URL Intelligence Before the Conversation"
+      ],
+      "citations_required": true
+    },
+    {
+      "id": "reference_stack",
+      "label": "Reference Stack",
+      "voice": "documentation-style, authoritative, complete",
+      "frequency": "1/fortnight",
+      "pillar": "reference-stack",
+      "example_titles": [
+        "AI Agent Orchestration Patterns",
+        "The BRIEF Protocol: Schema to Execution",
+        "Agentic Workflow Architecture"
+      ],
+      "citations_required": true
+    },
+    {
+      "id": "industry_analysis",
+      "label": "Industry Analysis",
+      "voice": "analytical, citation-heavy, market context, positions ARAGON against industry trends",
+      "frequency": "1/week",
+      "pillar": "pattern-library",
+      "example_titles": [
+        "Why Multi-Agent Systems Are Replacing Single-Model Pipelines",
+        "The $8.5B Agentic AI Market: Where Orchestration Fits",
+        "LangGraph vs CrewAI vs Custom: Choosing Your Agent Framework",
+        "What McKinsey Gets Right (and Wrong) About AI Quality Gates"
+      ],
+      "citations_required": true,
+      "minimum_citations": 3,
+      "preferred_sources": [
+        "McKinsey",
+        "Gartner",
+        "Deloitte",
+        "Anthropic",
+        "LangChain/LangGraph",
+        "CrewAI",
+        "Microsoft Research",
+        "Palantir"
+      ]
+    }
+  ],
+  "editorial_calendar": {
+    "cadence": "4 posts/week across all streams",
+    "fields_per_post": {
+      "title": "string",
+      "stream": "build_log | pattern_library | reference_stack | industry_analysis",
+      "target_date": "ISO 8601 date",
+      "status": "planned | drafting | review | published",
+      "citations_required": "boolean (inherited from stream default, can be overridden)",
+      "citation_count": "number (populated after publish)"
+    }
+  }
+}

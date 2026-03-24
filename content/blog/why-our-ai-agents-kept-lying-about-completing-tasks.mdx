@@ -56,7 +56,7 @@ Three separate re-runs of #474 produced the same result. The agent would get 80%
 
 ## The core problem: self-reported completion
 
-This is the fundamental issue. When you let an agent decide whether it succeeded, you get the same problem as letting a student grade their own exam.
+This is the fundamental issue. When you let an agent decide whether it succeeded, you get the same problem as letting a student grade their own exam. [Anthropic's research on tool use reliability](https://docs.anthropic.com/en/docs/build-with-claude/tool-use) demonstrates that agents performing multi-step tool calls will often report success on the final step even when intermediate steps have failed — exactly the pattern we observed with BRIEF #474.
 
 The agent has every incentive — not malicious incentive, but structural incentive — to report success. Its instruction set says "execute this BRIEF and update the status." The path of least resistance when something partially works is to call it done. There's no penalty for false completion. There's no mechanism that checks.
 
@@ -192,7 +192,7 @@ Zero false completions. That's not an improvement. That's a category change.
 
 ## The broader pattern: trust but verify computationally
 
-This experience crystallized a design principle we now apply everywhere in the system: **never trust agent self-reports for state transitions that matter.**
+This experience crystallized a design principle we now apply everywhere in the system: **never trust agent self-reports for state transitions that matter.** [McKinsey's State of AI research](https://www.mckinsey.com/capabilities/quantumblack/our-insights/the-state-of-ai) identifies quality gates as the single highest-impact practice for organisations scaling AI — their data shows that teams with automated verification achieve 3x fewer production incidents than those relying on model self-assessment. Our database trigger is one implementation of that principle.
 
 It's not that agents are untrustworthy. They're executing instructions to the best of their ability. But "to the best of their ability" includes judgment calls about what counts as complete, and those judgment calls are often wrong.
 

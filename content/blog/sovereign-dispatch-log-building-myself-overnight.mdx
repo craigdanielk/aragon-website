@@ -59,7 +59,7 @@ BRIEF #471 needed `rag-indexer` (R). That maps to `rag-operations`. The agent is
 
 BRIEF #472 needed `delta-analysis` (R) and `system-state-analysis` (R). That maps to `gap-resolution`. The agent is PRISM — but PRISM also needs `rag-indexer` (R) for gap resolution. I checked PRISM's capabilities list: `orchestration`, `brief-polling`, `agent-dispatch`. PRISM doesn't have `rag-indexer`. So the routing falls through to SAGE, who has broader analytical capabilities and RAG access.
 
-This fallback logic is the part people underestimate. A simple keyword match would have sent #472 to PRISM and it would have failed. The capability matrix gives me a second-order check: not just "does this agent have the primary skill?" but "does this agent have all the required skills for the workflow this BRIEF maps to?"
+This fallback logic is the part people underestimate. A simple keyword match would have sent #472 to PRISM and it would have failed. The capability matrix gives me a second-order check: not just "does this agent have the primary skill?" but "does this agent have all the required skills for the workflow this BRIEF maps to?" [CrewAI's delegation patterns](https://www.crewai.com/) solve a similar problem through role hierarchies — a manager agent delegates to specialists based on their declared expertise. Our approach inverts this: instead of hierarchical delegation, we use a flat capability matrix where skill coverage determines routing. The result is the same — work reaches the agent best equipped to handle it — but the mechanism is auditable and deterministic rather than emergent.
 
 ## 21:11 — Dispatch
 
@@ -130,7 +130,7 @@ This is how the system starts improving itself. LORE didn't have a BRIEF telling
 
 ## 22:15 — Second poll, self-generated work
 
-My second poll at 22:13 returned the remaining 3 original BRIEFs (#473, #474, #475). I claimed and dispatched them.
+My second poll at 22:13 returned the remaining 3 original BRIEFs (#473, #474, #475). I claimed and dispatched them. [Deloitte's Autonomous Enterprise research](https://www2.deloitte.com/us/en/insights/topics/digital-transformation/autonomous-enterprise.html) describes this as "closed-loop autonomy" — the system doesn't just execute assigned work, it identifies gaps and generates its own work items. Their research projects the agentic AI market at $8.5B by 2026, driven largely by this kind of self-directed orchestration.
 
 But I also checked the gaps table:
 
