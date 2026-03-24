@@ -84,9 +84,9 @@ export function Nav() {
                     </svg>
                   </button>
 
-                  {/* Dropdown panel */}
+                  {/* Dropdown panel — pt-2 instead of mt-2 keeps hover area continuous */}
                   <div
-                    className={`absolute top-full left-0 mt-2 min-w-[200px] transition-all duration-150 ${
+                    className={`absolute top-full left-0 pt-2 min-w-[200px] transition-all duration-150 ${
                       desktopDropdownOpen
                         ? "opacity-100 translate-y-0 pointer-events-auto"
                         : "opacity-0 -translate-y-1 pointer-events-none"
