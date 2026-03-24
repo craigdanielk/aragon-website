@@ -2,14 +2,29 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Agentic Workflow Architecture",
+  title: "Agentic Workflow Architecture | A.R.A.G.O.N.",
   description:
-    "North Star autonomous agent orchestration — templatised workflow templates and dynamic capability routing. How A.R.A.G.O.N. routes work through 72 nodes and 99 edges.",
+    "North Star autonomous agent orchestration — templatised workflow templates and dynamic capability routing. How A.R.A.G.O.N. dispatches work across 14 agents using deterministic templates and magentic fallback.",
   openGraph: {
     title: "Agentic Workflow Architecture | A.R.A.G.O.N.",
     description:
       "North Star autonomous agent orchestration — templatised workflow templates and dynamic capability routing.",
     type: "article",
+    images: [
+      {
+        url: "/og-architecture.png",
+        width: 1200,
+        height: 630,
+        alt: "North Star Agentic Workflow Architecture — 3D force graph showing 72 nodes, 99 edges",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Agentic Workflow Architecture | A.R.A.G.O.N.",
+    description:
+      "Templatised dispatch vs magentic routing — how North Star decides which agent handles which work.",
+    images: ["/og-architecture.png"],
   },
   keywords: [
     "agentic workflow",
@@ -17,14 +32,16 @@ export const metadata: Metadata = {
     "workflow templates",
     "capability routing",
     "multi-agent system",
-    "LangGraph",
     "autonomous agents",
     "hyperautomation",
+    "LangGraph",
+    "CrewAI",
+    "Anthropic tool use",
   ],
 };
 
 // JSON-LD Schema.org TechArticle markup for GEO optimization.
-// Content is sourced from hardcoded trusted strings, not user input.
+// All values are hardcoded constants — no user input reaches JSON.stringify. Safe from XSS.
 function TechArticleSchema() {
   const schema = {
     "@context": "https://schema.org",
@@ -40,7 +57,7 @@ function TechArticleSchema() {
     datePublished: "2026-03-24",
     dateModified: "2026-03-24",
     keywords:
-      "agentic workflow, AI orchestration, workflow templates, capability routing, multi-agent system",
+      "agentic workflow, AI orchestration, workflow templates, capability routing, multi-agent system, hyperautomation, LangGraph, CrewAI, autonomous agents",
     url: "https://aragon-website-livid.vercel.app/architecture",
     about: [
       {
@@ -53,25 +70,35 @@ function TechArticleSchema() {
         "@type": "DefinedTerm",
         name: "Magentic Mode",
         description:
-          "Dynamic capability routing fallback using COMPASS classification, LORE skill check, and PRISM routing.",
+          "Dynamic capability routing fallback using COMPASS classification, LORE skill check, and PRISM routing. Returns agent, skills, tools, workflow_pattern, model, and estimated_cost.",
       },
       {
         "@type": "DefinedTerm",
         name: "Self-Learning Loop",
         description:
-          "Successful magentic routes are promoted to templatised workflows, creating a self-improving system.",
+          "Successful magentic routes are promoted to templatised workflows, creating a self-improving orchestration system.",
       },
     ],
     citation: [
       {
         "@type": "WebPage",
-        name: "LangGraph: Multi-Agent Workflows",
+        name: "LangGraph: Stateful Multi-Agent Orchestration",
         url: "https://www.langchain.com/langgraph",
       },
       {
         "@type": "WebPage",
-        name: "Anthropic: Tool Use with Claude",
+        name: "Anthropic: Tool Use and Agentic Orchestration",
         url: "https://docs.anthropic.com/en/docs/build-with-claude/tool-use",
+      },
+      {
+        "@type": "WebPage",
+        name: "CrewAI: Dynamic Task Delegation Patterns",
+        url: "https://www.crewai.com/",
+      },
+      {
+        "@type": "WebPage",
+        name: "Microsoft AutoGen: Multi-Agent Conversation Framework",
+        url: "https://microsoft.github.io/autogen/",
       },
       {
         "@type": "Report",
@@ -85,7 +112,7 @@ function TechArticleSchema() {
       },
       {
         "@type": "Report",
-        name: "Deloitte: Autonomous Enterprise",
+        name: "Deloitte: Autonomous Enterprise — AI Agent Market $8.5B 2026, $35-52B by 2030",
         url: "https://www2.deloitte.com/us/en/insights/topics/digital-transformation/autonomous-enterprise.html",
       },
     ],
@@ -126,8 +153,8 @@ export default function ArchitecturePage() {
       <TechArticleSchema />
 
       <header className="mb-12">
-        <p className="text-xs font-mono text-neutral-600 mb-3 uppercase tracking-wider">
-          Technical Reference
+        <p className="text-xs font-mono text-[var(--accent-green)] mb-3 uppercase tracking-wider">
+          Technical Reference · Updated 2026-03-24
         </p>
         <h1 className="text-4xl md:text-5xl font-bold text-neutral-100 mb-6 leading-tight">
           Agentic Workflow Architecture
@@ -320,9 +347,37 @@ export default function ArchitecturePage() {
   "skills": ["web-builder", "github-automation"],
   "tools": ["vercel-deploy", "lighthouse-ci"],
   "workflow_pattern": "website-build",
-  "model": "claude-sonnet-4-512k"
+  "model": "claude-sonnet-4-5",
+  "estimated_cost": "$4.20"
 }`}
         </pre>
+
+        <h3 className="text-lg font-semibold text-neutral-200 mb-3">
+          Dispatch Patterns
+        </h3>
+        <div className="space-y-2 mb-6">
+          {[
+            {
+              pattern: "direct_skill",
+              desc: "Single agent, single skill. Used for simple, well-defined tasks.",
+            },
+            {
+              pattern: "skill_chain",
+              desc: "Single agent, multiple skills invoked in sequence. Most common pattern.",
+            },
+            {
+              pattern: "agent_team",
+              desc: "Multiple agents coordinated by SOVEREIGN. Used for complex multi-domain work.",
+            },
+          ].map((p) => (
+            <div key={p.pattern} className="flex gap-3 items-start text-sm">
+              <code className="text-[var(--accent-green)] font-mono shrink-0 pt-0.5">
+                {p.pattern}
+              </code>
+              <p className="text-neutral-400">{p.desc}</p>
+            </div>
+          ))}
+        </div>
 
         <div className="p-4 rounded-lg border border-dashed border-neutral-700 bg-neutral-900/50">
           <p className="text-sm text-neutral-500 font-mono mb-2">
