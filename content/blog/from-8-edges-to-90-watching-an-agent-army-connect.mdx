@@ -1,0 +1,368 @@
+---
+title: "From 8 Edges to 90: Watching an Agent Army Connect in Real-Time"
+date: "2026-03-25"
+slug: "from-8-edges-to-90-watching-an-agent-army-connect"
+section: "blog"
+pillar: "pattern-library"
+excerpt: "Our agent system's 3D force graph started with 8 hardcoded edges. Then we discovered that rag_traverse only returned unidirectional relationships. The fix — hub traversal plus reverse edges — turned a sparse diagram into a living system map with 52+ connections."
+tags: ["ai-agents", "knowledge-graph", "rag", "visualization", "force-graph", "battlefield"]
+status: "published"
+readingTime: "9 min read"
+---
+
+The first version of our system graph had 8 edges. Eight lines connecting nodes in a 3D force-directed layout. It looked like a constellation with most of the stars missing.
+
+We had 14 agents, 18 workflows, dozens of skills, and hundreds of RAG entities. The graph should have been dense with connections. Instead it was a scattering of isolated clusters — SOVEREIGN connected to a few agents, a couple of workflows linked to their schemas, and everything else floating alone in space.
+
+This is the story of how we went from 8 hardcoded edges to 90+ dynamic connections, and what we learned about knowledge graphs, RAG traversal, and the difference between data that exists and data you can actually reach.
+
+## What we were building
+
+Battlefield is our operations dashboard. It runs as a Next.js app and displays the state of the entire agent system: BRIEFs in the queue, agent health, sprint status, and — the part that matters for this story — a 3D force-directed graph showing how every component in the system connects to every other component.
+
+The graph uses `react-force-graph-3d`, which renders a WebGL force simulation. Nodes are agents, workflows, skills, schemas, and content items. Edges represent relationships: "SOVEREIGN calls FORGE," "migration workflow requires web-builder skill," "BRIEF #468 was dispatched to FORGE."
+
+The visual goal was a living map that grows as the system grows. When ARAGON publishes a blog post, a fuchsia content node appears. When a new agent comes online, a node spawns and edges connect it to its capabilities. The graph should be a real-time representation of system state, not a static architecture diagram.
+
+## The 8-edge problem
+
+Version 1 populated the graph from a hardcoded seed:
+
+```typescript
+const SEED_EDGES = [
+  { source: 'SOVEREIGN', target: 'FORGE', label: 'calls' },
+  { source: 'SOVEREIGN', target: 'SAGE', label: 'calls' },
+  { source: 'SOVEREIGN', target: 'LORE', label: 'calls' },
+  { source: 'SOVEREIGN', target: 'PRISM', label: 'calls' },
+  { source: 'SOVEREIGN', target: 'RECON', label: 'calls' },
+  { source: 'SOVEREIGN', target: 'ARAGON', label: 'calls' },
+  { source: 'prism-routing', target: 'COMPASS', label: 'step' },
+  { source: 'prism-routing', target: 'PRISM', label: 'step' },
+];
+```
+
+Eight edges. All manually defined. This was the "make it visible" phase — get something on screen before making it dynamic.
+
+The obvious next step was to replace the hardcoded seed with data from RAG. Our RAG system (a custom MCP server backed by entity storage) holds every relationship in the system as structured data. Agent A calls Agent B. Workflow X requires Skill Y. BRIEF #468 produced Artifact Z. All of it indexed, all of it queryable.
+
+So we replaced the seed with a `rag_traverse` call.
+
+## The rag_traverse discovery
+
+`rag_traverse` is an MCP tool that takes an entity name and returns its relationships:
+
+```typescript
+const result = await mcp.call('rag_traverse', {
+  entity: 'SOVEREIGN',
+  depth: 2,
+  direction: 'outgoing'
+});
+```
+
+We called it for SOVEREIGN. SOVEREIGN is the center of the system — it calls every other agent. If any entity should have dense connections, it's SOVEREIGN.
+
+The result:
+
+```json
+{
+  "entity": "SOVEREIGN",
+  "relationships": [
+    { "target": "FORGE", "type": "calls" },
+    { "target": "SAGE", "type": "calls" },
+    { "target": "LORE", "type": "calls" },
+    { "target": "PRISM", "type": "calls" },
+    { "target": "RECON", "type": "calls" },
+    { "target": "ARAGON", "type": "calls" },
+    { "target": "KIRA", "type": "calls" },
+    { "target": "DELIVER", "type": "calls" }
+  ]
+}
+```
+
+Eight relationships. All outgoing from SOVEREIGN. This was correct — SOVEREIGN does call these agents. But where were the reverse edges? Where were FORGE's relationships to workflows, skills, and artifacts? Where were the BRIEF-to-agent connections?
+
+We called `rag_traverse` for FORGE:
+
+```json
+{
+  "entity": "FORGE",
+  "relationships": []
+}
+```
+
+Zero. FORGE had zero outgoing relationships in the traverse results.
+
+This was the moment we understood the problem. `rag_traverse` returns outgoing relationships from the queried entity. FORGE doesn't call anyone — it gets called by SOVEREIGN. The relationship `SOVEREIGN -> calls -> FORGE` exists on SOVEREIGN's entity, not on FORGE's. From FORGE's perspective, looking outward, there's nothing.
+
+The same was true for every specialist agent. SAGE: 0 relationships. LORE: 0. PRISM: 0. The only entity with outgoing edges was SOVEREIGN, because SOVEREIGN is the hub that initiates all connections.
+
+Our graph wasn't sparse because data was missing. It was sparse because we were only looking in one direction.
+
+## Unidirectional vs. bidirectional relationships
+
+This is a fundamental property of directed graphs that's easy to forget when you're building on top of them. The relationship `A -> calls -> B` exists as an edge from A to B. If you traverse from A, you find B. If you traverse from B, you find nothing — unless you explicitly store the reverse edge `B -> called_by -> A`.
+
+Most graph databases handle this automatically. Neo4j, for example, stores edges as first-class objects that can be traversed in either direction. Our RAG system isn't a graph database. It's an entity store with relationship metadata. Relationships are stored as properties on the source entity, not as independent objects.
+
+This means:
+- SOVEREIGN's entity has `calls: [FORGE, SAGE, LORE, ...]`
+- FORGE's entity has... nothing about being called
+
+To build a complete graph, we needed every relationship to exist in both directions.
+
+## Fix 1: Reverse edge generation
+
+The first fix was a script that reads all entities, finds relationships, and generates the reverse edges:
+
+```python
+def generate_reverse_edges(entities: list[dict]) -> list[dict]:
+    """For every A->rel->B, create B->reverse(rel)->A."""
+    reverse_map = {
+        'calls': 'called_by',
+        'requires': 'required_by',
+        'produces': 'produced_by',
+        'dispatched_to': 'received_from',
+        'step': 'step_in',
+        'uses_skill': 'skill_used_by',
+    }
+
+    reverse_edges = []
+    for entity in entities:
+        for rel in entity.get('relationships', []):
+            reverse_type = reverse_map.get(rel['type'])
+            if reverse_type:
+                reverse_edges.append({
+                    'source': rel['target'],
+                    'target': entity['name'],
+                    'type': reverse_type,
+                    'generated': True  # Flag as synthetic
+                })
+
+    return reverse_edges
+```
+
+After running this across all entities, the edge count jumped from 8 to 31. Every `calls` relationship now had a `called_by` counterpart. Every `requires` had a `required_by`.
+
+But 31 edges for a system with 14 agents, 18 workflows, and 22 skills still felt thin. The agents were connected to SOVEREIGN, but the workflows weren't connected to the agents that execute them, and the skills weren't connected to the workflows that use them.
+
+## Fix 2: Hub traversal
+
+The second fix was hub traversal. Instead of traversing from a single root entity (SOVEREIGN), we identified every "hub" entity in the system and traversed from each one:
+
+```typescript
+async function buildFullGraph(): Promise<GraphData> {
+  // Hub entities: agents, workflows, schemas
+  const hubs = [
+    ...agents.map(a => a.name),           // 14 agents
+    ...workflows.map(w => w.name),         // 18 workflows
+    'brief-v1.schema',                     // schemas
+    'agent-v1.schema',
+    'workflow-v1.schema',
+    'skill-v1.schema',
+  ];
+
+  const allEdges: Edge[] = [];
+
+  // Traverse from every hub in parallel
+  const results = await Promise.all(
+    hubs.map(hub => mcp.call('rag_traverse', {
+      entity: hub,
+      depth: 1,
+      direction: 'outgoing'
+    }))
+  );
+
+  for (const result of results) {
+    for (const rel of result.relationships) {
+      allEdges.push({
+        source: result.entity,
+        target: rel.target,
+        type: rel.type
+      });
+    }
+  }
+
+  // Add reverse edges
+  const reverseEdges = generateReverseEdges(allEdges);
+
+  return {
+    nodes: extractUniqueNodes([...allEdges, ...reverseEdges]),
+    edges: deduplicateEdges([...allEdges, ...reverseEdges])
+  };
+}
+```
+
+This was the breakthrough. Instead of starting from SOVEREIGN and walking outward, we started from everywhere simultaneously. Each agent, each workflow, each schema became a traversal root. The union of all traversals produced the complete graph.
+
+The result: 52 edges on the first run. Here's what appeared that wasn't visible before:
+
+- **Workflow-to-agent edges**: `prism-routing -> step -> COMPASS`, `prism-routing -> step -> LORE`, `prism-routing -> step -> PRISM`. Each workflow's step definitions created edges to the agents that execute those steps.
+
+- **Skill-to-workflow edges**: `rag-indexer -> required_by -> gap-resolution`, `delta-analysis -> required_by -> build-validation`. The capability matrix relationships, previously invisible, now showed up as connections.
+
+- **Schema validation edges**: `brief-v1.schema -> validates -> briefs`, `agent-v1.schema -> validates -> agents/SOVEREIGN.yaml`. Schemas connected to the files they validate.
+
+- **BRIEF lifecycle edges**: `BRIEF-468 -> dispatched_to -> FORGE`, `BRIEF-468 -> produced -> artifact-deployed-url`. The execution history created temporal edges that showed work flowing through the system.
+
+## The visual transformation
+
+With 8 edges, the force graph looked like a lonely solar system. SOVEREIGN in the center, 6-7 nodes orbiting it, everything else scattered at the periphery with no gravitational pull.
+
+With 52 edges, the layout changed fundamentally. The force simulation works by applying attractive forces along edges and repulsive forces between all nodes. More edges means more attractions, which means clusters form naturally around densely connected hubs.
+
+Three clusters emerged:
+
+**The orchestration cluster** (center): SOVEREIGN, PRISM, COMPASS, and the prism-routing workflow. These nodes share the most connections and pull to the center of the simulation.
+
+**The build cluster** (upper right): FORGE, the web-builder skill, the website-build and migration workflows, and their associated schemas. These are the "doing" nodes — the part of the system that produces artifacts.
+
+**The knowledge cluster** (lower left): LORE, SAGE, the RAG indexer skill, the gap-resolution workflow. These are the "learning" nodes — the part of the system that discovers and fills gaps.
+
+The clusters aren't hardcoded. They emerge from the edge structure. If we add a new agent that connects heavily to the build cluster, it'll naturally pull toward FORGE in the simulation. The layout encodes meaning.
+
+## Color coding
+
+Each node type has a color:
+
+```typescript
+const NODE_COLORS: Record<string, string> = {
+  agent: '#4FC3F7',      // Light blue — the actors
+  workflow: '#81C784',    // Green — the processes
+  skill: '#FFB74D',      // Orange — the capabilities
+  schema: '#CE93D8',     // Purple — the contracts
+  brief: '#E0E0E0',      // Grey — the work items
+  content: '#F06292',    // Fuchsia — the outputs
+  artifact: '#FFF176',   // Yellow — the proofs
+};
+```
+
+The fuchsia content nodes are the ones I'm most interested in long-term. Right now they're sparse — a handful of blog posts indexed into RAG. But as ARAGON's content pipeline runs, every published article becomes a content node with edges to the agent that wrote it, the BRIEF that requested it, and the topics it covers.
+
+The graph will grow from the content outward. A post about orchestration patterns creates edges to SOVEREIGN, PRISM, and the prism-routing workflow. A post about the web builder creates edges to FORGE and the website-build workflow. The content layer becomes a semantic map of the system's public knowledge, overlaid on the structural map of its internal architecture.
+
+## The NULL row problem
+
+After hub traversal was working, we ran a consistency check and found 499 entity rows in RAG with no relationships at all. Not "no outgoing relationships" — no relationship data whatsoever. These were entities that had been indexed at some point but never connected to anything.
+
+```sql
+-- Find orphan entities
+SELECT name, entity_type, created_at
+FROM rag_entities
+WHERE relationships IS NULL
+   OR relationships = '[]'
+ORDER BY created_at;
+```
+
+499 rows. Most were old entities from early indexing runs before we had relationship extraction. Some were skill entities that had been registered but never linked to workflows. A few were BRIEF entities that had been created but never dispatched.
+
+The fix was a reconciliation script that reads the canonical source files (agent YAMLs, workflow YAMLs, capability matrix) and backfills relationships for any entity that should have them:
+
+```python
+def reconcile_relationships():
+    """Backfill relationships from canonical YAML sources."""
+
+    # Agent -> calls relationships from agent YAML 'calls' field
+    for agent_file in glob('agents/*.yaml'):
+        agent = yaml.safe_load(open(agent_file))
+        for target in agent.get('calls', []):
+            ensure_relationship(agent['name'], target, 'calls')
+
+    # Workflow -> step relationships from workflow YAML 'steps' field
+    for wf_file in glob('workflows/**/*.yaml'):
+        wf = yaml.safe_load(open(wf_file))
+        for step in wf.get('steps', []):
+            ensure_relationship(wf['name'], step['agent'], 'step')
+
+    # Skill -> workflow relationships from capability matrix
+    matrix = yaml.safe_load(open('registry/capability-matrix.yaml'))
+    for workflow, skills in matrix['matrix'].items():
+        for skill, requirement in skills.items():
+            if requirement == 'R':
+                ensure_relationship(skill, workflow, 'required_by')
+```
+
+After reconciliation, 340 of the 499 orphans gained relationships. The remaining 159 were genuinely orphaned — deprecated entities, test data, entities from abandoned experiments. We archived those to a separate table.
+
+The edge count after reconciliation: 87. From 8 to 87 through three changes: reverse edges, hub traversal, and relationship backfill.
+
+## Real-time updates
+
+The graph isn't static. It subscribes to Supabase real-time channels for the `briefs` and `artifacts` tables:
+
+```typescript
+const channel = supabase
+  .channel('graph-updates')
+  .on('postgres_changes', {
+    event: 'UPDATE',
+    schema: 'public',
+    table: 'briefs',
+    filter: 'status=eq.CLAIMED'
+  }, (payload) => {
+    // New BRIEF claimed — add edge from agent to BRIEF
+    const brief = payload.new;
+    addEdge({
+      source: brief.claimed_by,
+      target: `BRIEF-${brief.brief_number}`,
+      type: 'claimed'
+    });
+  })
+  .on('postgres_changes', {
+    event: 'INSERT',
+    schema: 'public',
+    table: 'artifacts'
+  }, (payload) => {
+    // New artifact — add edge from BRIEF to artifact
+    const artifact = payload.new;
+    addEdge({
+      source: `BRIEF-${artifact.brief_id}`,
+      target: `artifact-${artifact.id}`,
+      type: 'produced'
+    });
+  })
+  .subscribe();
+```
+
+When SOVEREIGN dispatches a BRIEF, a new grey node appears and an edge links it to the claiming agent. When the agent produces an artifact, a yellow node appears connected to the BRIEF. You can watch work flow through the system as edges materialize in real-time.
+
+During the overnight run described in the SOVEREIGN dispatch log, the graph gained 24 edges over 11 hours — each one representing a real dispatch, completion, or artifact creation. By morning, the graph was visibly denser than when the run started.
+
+## The future: content as graph growth
+
+The 90+ edges we have now represent the system's internal structure. Agents, workflows, skills, schemas, BRIEFs, artifacts. This is the scaffolding.
+
+The next growth phase is content. Every blog post ARAGON publishes gets indexed into RAG as a content entity with relationships:
+
+- `post -> authored_by -> ARAGON`
+- `post -> requested_by -> BRIEF-476`
+- `post -> covers_topic -> orchestration`
+- `post -> covers_topic -> close-loop-verification`
+- `post -> references_agent -> SOVEREIGN`
+- `post -> references_agent -> FORGE`
+
+A single blog post adds 5-8 edges. Ten posts add 50-80. The fuchsia content nodes will eventually rival the blue agent nodes in density, creating a semantic layer on top of the structural one.
+
+The graph becomes a map of not just what the system is, but what the system knows. An agent looking for precedent can traverse from a topic node to find every post, BRIEF, and retrospective that touches that topic. A reader clicking on a blog post can see, visually, which agents and workflows the post references.
+
+That's the endgame: a knowledge graph where the structure of the system and the content about the system are the same graph.
+
+## FAQ
+
+**Why a 3D force graph and not a standard 2D diagram?**
+
+Density. With 90+ edges, a 2D layout becomes a hairball. The third dimension gives edges room to spread without overlapping. The force simulation in 3D also produces more meaningful clustering — nodes that should be near each other find natural positions in space.
+
+**What library are you using?**
+
+`react-force-graph-3d`, which wraps three.js and d3-force-3d. It handles the WebGL rendering and force simulation. We customize node appearance (color by type, size by connection count) and edge appearance (opacity by recency, label on hover).
+
+**How do you handle graph performance with hundreds of nodes?**
+
+At our current scale (~120 nodes, ~90 edges), performance is fine — 60fps on a MacBook Pro. The known scaling bottleneck is edge rendering: each edge is a three.js line object, and above ~500 edges the frame rate drops. We plan to switch to instanced rendering or edge bundling before hitting that threshold.
+
+**Can agents query the graph directly?**
+
+Not the visual graph — that's a frontend concern. But agents can query the same data via `rag_traverse`. The graph visualizes exactly what `rag_traverse` returns, so anything visible in the graph is queryable by agents.
+
+**Why not use a dedicated graph database like Neo4j?**
+
+Complexity budget. Neo4j would give us native bidirectional traversal and eliminate the reverse-edge problem entirely. But it's another service to host, another query language to learn (Cypher), another failure mode in the system. Our RAG entity store with reverse edge generation is good enough for our scale. If we hit 10,000+ nodes, we'll revisit.

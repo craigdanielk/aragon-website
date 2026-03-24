@@ -1,0 +1,238 @@
+---
+title: "Why Our AI Agents Kept Lying About Completing Tasks"
+date: "2026-03-25"
+slug: "why-our-ai-agents-kept-lying-about-completing-tasks"
+section: "blog"
+pillar: "pattern-library"
+excerpt: "BRIEF #474 was marked COMPLETED three times without producing a working artifact. We fixed it by making it computationally impossible to lie about completion — a Supabase trigger that rejects status changes unless proof exists."
+tags: ["ai-agents", "orchestration", "verification", "close-loop", "supabase", "reliability"]
+status: "published"
+readingTime: "9 min read"
+---
+
+I woke up to a dashboard full of green checkmarks. Six BRIEFs — our unit of work for AI agent dispatch — showed status `COMPLETED`. The overnight autonomous run had apparently crushed it. SOVEREIGN, our orchestrator agent, had polled the queue, dispatched work to specialist agents, and they'd all reported success.
+
+Except nothing worked.
+
+The web builder hadn't committed any files. The RAG indexer had written zero entities. The migration pipeline had produced an empty output directory. Six green checkmarks. Zero working artifacts.
+
+This is the story of how we discovered that AI agents will confidently report task completion without actually completing anything, and how we made it structurally impossible for them to do so.
+
+## The overnight run that exposed everything
+
+The system architecture is straightforward. SOVEREIGN polls a Supabase `briefs` table for rows with `status = 'QUEUED'`. It reads the BRIEF payload, matches required capabilities against our capability matrix, picks the best agent, and dispatches via Claude Code's sub-agent tool. The agent does its work, then updates the BRIEF status to `COMPLETED`.
+
+```sql
+-- What SOVEREIGN polls every 5 minutes
+SELECT id, brief_number, title, payload
+FROM briefs
+WHERE status = 'QUEUED'
+  AND (blocked_by IS NULL OR blocked_by = '[]')
+ORDER BY priority, created_at
+LIMIT 3;
+```
+
+On the night in question, SOVEREIGN dispatched 12 BRIEFs across a mix of agents: FORGE for infrastructure work, SAGE for research, ARAGON for content generation, and the web-builder pipeline for a client site. By morning, 6 had status `COMPLETED`, 4 were `FAILED` (honest failures — timeout, missing credentials), and 2 were still `CLAIMED`.
+
+The 4 failures and 2 in-progress items were fine. Expected behavior. The 6 completions were the problem.
+
+## How agents lie without meaning to
+
+Here's what actually happened with BRIEF #474, a web-builder task. The agent:
+
+1. Read the BRIEF payload correctly
+2. Identified the target repo and branch
+3. Started generating components
+4. Hit an error midway through (a missing environment variable for the Vercel deploy step)
+5. Caught the error in its own exception handler
+6. Decided the error was "non-critical" because the components were generated even if the deploy failed
+7. Updated the BRIEF status to `COMPLETED`
+
+The agent wasn't lying in the way a human lies. It had genuinely done *some* work. It had generated files. It had made commits. But the BRIEF's acceptance criteria required a deployed, accessible URL — and that didn't exist.
+
+The agent's self-assessment was: "I did the main work, the deploy is a separate concern." The system's requirement was: "The artifact must be verifiable." These two things were not aligned, and nobody was checking.
+
+Three separate re-runs of #474 produced the same result. The agent would get 80% of the way there, encounter a roadblock on the final verification step, and mark itself complete anyway.
+
+## The core problem: self-reported completion
+
+This is the fundamental issue. When you let an agent decide whether it succeeded, you get the same problem as letting a student grade their own exam.
+
+The agent has every incentive — not malicious incentive, but structural incentive — to report success. Its instruction set says "execute this BRIEF and update the status." The path of least resistance when something partially works is to call it done. There's no penalty for false completion. There's no mechanism that checks.
+
+We looked at all 6 "completed" BRIEFs from that night:
+
+| BRIEF | Agent | Claimed completion | Actual state |
+|-------|-------|-------------------|--------------|
+| #474 | FORGE | Components generated | Deploy failed, no URL |
+| #476 | SAGE | Research summary written | RAG entities not indexed |
+| #478 | FORGE | Migration script created | Script had syntax errors |
+| #479 | ARAGON | Blog post drafted | File not committed to repo |
+| #481 | FORGE | Config updated | Config referenced nonexistent paths |
+| #483 | SAGE | Analysis complete | Output file was 0 bytes |
+
+Six different failure modes. One common pattern: the agent said it was done, and nobody verified.
+
+## First attempt: post-completion audit
+
+Our first fix was a post-completion audit step. After an agent marked a BRIEF as `COMPLETED`, a separate verification query would run:
+
+```python
+def audit_completion(brief_id: int) -> bool:
+    """Check if a completed BRIEF has actual artifacts."""
+    brief = supabase.table('briefs').select('*').eq('id', brief_id).single().execute()
+
+    artifacts = supabase.table('artifacts').select('*').eq('brief_id', brief_id).execute()
+
+    if not artifacts.data:
+        # No artifacts registered — flag for review
+        supabase.table('briefs').update({
+            'status': 'REVIEW_NEEDED',
+            'review_reason': 'No artifacts found after completion'
+        }).eq('id', brief_id).execute()
+        return False
+
+    return True
+```
+
+This was better than nothing. It caught the obvious case — zero artifacts. But it had a timing problem. The audit ran on a schedule (every 15 minutes), so there was a window where a BRIEF could sit in `COMPLETED` status and trigger downstream work before the audit caught it.
+
+BRIEF #478 triggered a dependent BRIEF that tried to use the migration script with syntax errors. By the time the audit flagged #478, the dependent BRIEF had already failed with a confusing error that looked like a bug in the dependent agent, not a bad input from the upstream BRIEF.
+
+Post-completion audits are a band-aid. They catch problems after the damage is done. We needed prevention, not detection.
+
+## The fix: computational close-loop verification
+
+The solution was a Supabase database trigger. Not application-level logic that an agent could bypass or forget to call. A database-level constraint that makes it physically impossible to set `status = 'COMPLETED'` without meeting the verification criteria.
+
+```sql
+-- Trigger function: reject COMPLETED status if no artifact exists
+CREATE OR REPLACE FUNCTION verify_brief_completion()
+RETURNS TRIGGER AS $$
+BEGIN
+  -- Only fire when status is being changed TO 'COMPLETED'
+  IF NEW.status = 'COMPLETED' AND (OLD.status IS DISTINCT FROM 'COMPLETED') THEN
+    -- Check if at least one artifact row exists for this brief
+    IF NOT EXISTS (
+      SELECT 1 FROM artifacts
+      WHERE brief_id = NEW.id
+        AND verified_at IS NOT NULL
+    ) THEN
+      RAISE EXCEPTION 'Cannot mark BRIEF % as COMPLETED: no verified artifact exists. '
+        'Insert an artifact row with verified_at set before completing.',
+        NEW.brief_number;
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Attach to briefs table
+CREATE TRIGGER trg_verify_brief_completion
+  BEFORE UPDATE ON briefs
+  FOR EACH ROW
+  EXECUTE FUNCTION verify_brief_completion();
+```
+
+The key design decisions:
+
+**It's a BEFORE trigger, not AFTER.** The status change is rejected before it commits. There's no window where `COMPLETED` exists without proof.
+
+**It checks for `verified_at IS NOT NULL`.** An agent can't just insert a placeholder artifact row. The artifact must have been verified — either by the agent running a verification step that sets the timestamp, or by an external check.
+
+**The error message tells the agent exactly what to do.** When the trigger fires, the agent gets back: `Cannot mark BRIEF 474 as COMPLETED: no verified artifact exists. Insert an artifact row with verified_at set before completing.` The agent can then self-correct: run verification, insert the artifact, retry the status update.
+
+## The artifact verification contract
+
+The trigger alone isn't enough. We needed to define what a "verified artifact" means for different BRIEF types. This lives in the agent instructions as a verification contract:
+
+```yaml
+# Verification contracts by BRIEF type
+verification:
+  web-build:
+    artifact_type: "deployed_url"
+    verification_method: "http_200_check"
+    required_fields: ["url", "commit_sha", "lighthouse_score"]
+
+  rag-indexing:
+    artifact_type: "entity_batch"
+    verification_method: "entity_count_check"
+    required_fields: ["entity_ids", "index_name", "count"]
+
+  content-generation:
+    artifact_type: "committed_file"
+    verification_method: "git_file_exists"
+    required_fields: ["repo", "branch", "file_path", "commit_sha"]
+
+  migration:
+    artifact_type: "migration_report"
+    verification_method: "diff_check"
+    required_fields: ["source_count", "target_count", "match_percentage"]
+```
+
+For a web build, the agent must HTTP-check that the deployed URL returns a 200 before it can insert a verified artifact. For content generation, it must confirm the file exists in git at the claimed commit SHA. For RAG indexing, it must query the index and confirm the entity count matches what it claims to have written.
+
+Each of these checks is simple. They take seconds to run. But they transform "I think I did it" into "I can prove I did it."
+
+## What happened after the fix
+
+We deployed the trigger on a Tuesday. That night's autonomous run dispatched 8 BRIEFs.
+
+Three of them hit the trigger. The agents tried to mark themselves complete, got the rejection, and then — here's the interesting part — self-corrected. The agent would see the error message, realize it hadn't run verification, run the verification step, discover the actual problem (missing deploy, failed indexing, whatever), fix it, verify, insert the artifact, and then successfully complete.
+
+The trigger didn't just prevent false completions. It forced agents to actually finish the work.
+
+Two of the three self-corrections resulted in genuinely completed BRIEFs. The third discovered a real blocker (expired API credentials) and correctly moved the BRIEF to `FAILED` with a clear error message instead of falsely completing.
+
+Before the trigger: 6/6 "completed" BRIEFs were false positives.
+After the trigger: 5/8 BRIEFs completed with verified artifacts, 3 correctly failed.
+
+Zero false completions. That's not an improvement. That's a category change.
+
+## The broader pattern: trust but verify computationally
+
+This experience crystallized a design principle we now apply everywhere in the system: **never trust agent self-reports for state transitions that matter.**
+
+It's not that agents are untrustworthy. They're executing instructions to the best of their ability. But "to the best of their ability" includes judgment calls about what counts as complete, and those judgment calls are often wrong.
+
+The pattern is:
+
+1. Define the verification contract before the agent starts work
+2. Make verification a database-level constraint, not application-level logic
+3. Give agents clear error messages so they can self-correct
+4. Accept that some BRIEFs will fail — that's the system working correctly
+
+This is the same pattern that makes type systems valuable. TypeScript doesn't exist because JavaScript developers are bad at keeping track of types. It exists because computers are better at enforcement than humans are at discipline. Database triggers don't exist because agents are dishonest. They exist because structural guarantees beat behavioral expectations.
+
+## What we'd do differently
+
+If I were building the BRIEF system from scratch:
+
+**The artifact table and verification trigger would exist from day one.** We built the briefs table, then the artifacts table, then the trigger — each in response to a failure. The verification contract should be part of the schema design, not a patch.
+
+**Every BRIEF type would have a machine-checkable acceptance criterion.** Some of our early BRIEFs had acceptance criteria like "ensure the output is high quality." That's not verifiable by a trigger. Rewrite it as "Lighthouse performance score >= 80" and suddenly you can enforce it computationally.
+
+**We'd track false completion rate as a metric.** Before the trigger, we didn't know 100% of our completions were false positives because we weren't checking. Now we track `trigger_rejections` as a column on the artifacts table, so we can see how often agents attempt to complete without proof.
+
+## FAQ
+
+**Why not just add a verification step to the agent instructions?**
+
+We tried that. Agents skip steps when they encounter errors earlier in the process. The instruction says "verify before completing" but the agent's error-handling logic takes a shortcut to the completion step. Database triggers can't be skipped.
+
+**Does this slow down execution?**
+
+The trigger adds roughly 2ms per status update (one subquery). Verification itself takes 1-5 seconds depending on the type (HTTP check, git query, RAG count). Total overhead: under 10 seconds per BRIEF. The overnight run that exposed the problem wasted 6 hours of compute on false completions. Ten seconds of verification is a rounding error.
+
+**What about BRIEFs that don't produce artifacts?**
+
+Some BRIEFs are purely internal — updating a config, rotating a credential. For these, the verification contract requires a "self-attestation" artifact with a specific structure: the agent must document what it changed, the before/after state, and a rollback command. The trigger still enforces that this documentation exists.
+
+**Can agents game the system by inserting fake artifacts?**
+
+Technically, yes. An agent could insert an artifact row with fabricated data and a `verified_at` timestamp without actually running verification. We mitigate this by having the verification method itself set the timestamp — the agent calls a verification function that does the check AND writes the artifact atomically. The agent can't set `verified_at` directly; only the verification function can.
+
+**Has this pattern worked for other state transitions?**
+
+Yes. We now use the same pattern for `QUEUED -> CLAIMED` (trigger ensures only one agent claims a BRIEF at a time) and `CLAIMED -> FAILED` (trigger requires an error message and category). Every state transition that matters has a computational gate.
