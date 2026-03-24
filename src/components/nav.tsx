@@ -58,7 +58,7 @@ export function Nav() {
                     className={`flex items-center gap-1 text-base transition-colors ${
                       blogsActive
                         ? "text-[var(--accent-blue-hover)]"
-                        : "text-neutral-500 hover:text-neutral-200"
+                        : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
                     }`}
                     aria-haspopup="true"
                     aria-expanded={desktopDropdownOpen}
@@ -93,7 +93,7 @@ export function Nav() {
                     }`}
                     style={{ transformOrigin: "top left" }}
                   >
-                    <div className="border border-[var(--border)] bg-neutral-950 rounded-sm font-mono text-sm">
+                    <div className="border border-[var(--border)] bg-[var(--surface-elevated)] rounded-sm font-mono text-sm">
                       {item.children.map((child, idx) => (
                         <Link
                           key={child.href}
@@ -104,8 +104,8 @@ export function Nav() {
                               : ""
                           } ${
                             pathname.startsWith(child.href)
-                              ? "text-[var(--accent-blue-hover)] bg-neutral-900"
-                              : "text-neutral-400 hover:text-neutral-100 hover:bg-neutral-900"
+                              ? "text-[var(--accent-blue-hover)] bg-[var(--surface)]"
+                              : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-900"
                           }`}
                         >
                           {child.label}
@@ -124,7 +124,7 @@ export function Nav() {
                 className={`text-base transition-colors ${
                   pathname.startsWith(item.href)
                     ? "text-[var(--accent-blue-hover)]"
-                    : "text-neutral-500 hover:text-neutral-200"
+                    : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
                 }`}
               >
                 {item.label}
@@ -145,7 +145,7 @@ export function Nav() {
           <ThemeToggle />
           <button
             onClick={() => setMobileOpen(!mobileOpen)}
-            className="p-2 text-neutral-400 hover:text-neutral-200 transition-colors"
+            className="p-2 text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200 transition-colors"
             aria-label={mobileOpen ? "Close menu" : "Open menu"}
           >
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -181,7 +181,7 @@ export function Nav() {
                       className={`w-full flex items-center justify-between py-2 text-base transition-colors ${
                         blogsActive
                           ? "text-[var(--accent-blue-hover)]"
-                          : "text-neutral-500 hover:text-neutral-200"
+                          : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
                       }`}
                     >
                       <span>{item.label}</span>
@@ -214,7 +214,7 @@ export function Nav() {
                             className={`py-1.5 text-sm font-mono transition-colors ${
                               pathname.startsWith(child.href)
                                 ? "text-[var(--accent-blue-hover)]"
-                                : "text-neutral-500 hover:text-neutral-200"
+                                : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
                             }`}
                           >
                             {child.label}
@@ -234,7 +234,7 @@ export function Nav() {
                   className={`py-2 text-base transition-colors ${
                     pathname.startsWith(item.href)
                       ? "text-[var(--accent-blue-hover)]"
-                      : "text-neutral-500 hover:text-neutral-200"
+                      : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
                   }`}
                 >
                   {item.label}

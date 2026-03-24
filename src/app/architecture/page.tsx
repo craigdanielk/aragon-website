@@ -128,7 +128,7 @@ function TechArticleSchema() {
 
 function SectionAnchor({ id, children }: { id: string; children: React.ReactNode }) {
   return (
-    <h2 id={id} className="text-2xl md:text-3xl font-bold text-neutral-100 mb-4 mt-16 first:mt-0">
+    <h2 id={id} className="text-2xl md:text-3xl font-bold text-neutral-900 dark:text-neutral-900 dark:text-neutral-100 mb-4 mt-16 first:mt-0">
       {children}
     </h2>
   );
@@ -156,10 +156,10 @@ export default function ArchitecturePage() {
         <p className="text-xs font-mono text-[var(--accent-green)] mb-3 uppercase tracking-wider">
           Technical Reference · Updated 2026-03-24
         </p>
-        <h1 className="text-4xl md:text-5xl font-bold text-neutral-100 mb-6 leading-tight">
+        <h1 className="text-4xl md:text-5xl font-bold text-neutral-900 dark:text-neutral-100 mb-6 leading-tight">
           Agentic Workflow Architecture
         </h1>
-        <p className="text-lg text-neutral-400 max-w-2xl leading-relaxed">
+        <p className="text-lg text-neutral-600 dark:text-neutral-400 max-w-2xl leading-relaxed">
           How A.R.A.G.O.N. routes work through two complementary dispatch
           patterns: templatised workflows for known patterns and dynamic
           capability routing for novel work. Together they form a self-improving
@@ -171,22 +171,22 @@ export default function ArchitecturePage() {
           <p className="text-xs font-mono text-neutral-500 mb-3">On this page</p>
           <ol className="space-y-1.5 text-sm">
             <li>
-              <a href="#templatised-routes" className="text-neutral-400 hover:text-neutral-200 transition-colors">
+              <a href="#templatised-routes" className="text-neutral-600 dark:text-neutral-400 hover:text-neutral-800 dark:text-neutral-200 transition-colors">
                 1. Templatised Routes
               </a>
             </li>
             <li>
-              <a href="#magentic-mode" className="text-neutral-400 hover:text-neutral-200 transition-colors">
+              <a href="#magentic-mode" className="text-neutral-600 dark:text-neutral-400 hover:text-neutral-800 dark:text-neutral-200 transition-colors">
                 2. Magentic Mode
               </a>
             </li>
             <li>
-              <a href="#why-both" className="text-neutral-400 hover:text-neutral-200 transition-colors">
+              <a href="#why-both" className="text-neutral-600 dark:text-neutral-400 hover:text-neutral-800 dark:text-neutral-200 transition-colors">
                 3. Why Both
               </a>
             </li>
             <li>
-              <a href="#battlefield" className="text-neutral-400 hover:text-neutral-200 transition-colors">
+              <a href="#battlefield" className="text-neutral-600 dark:text-neutral-400 hover:text-neutral-800 dark:text-neutral-200 transition-colors">
                 4. Battlefield Visualization
               </a>
             </li>
@@ -197,7 +197,7 @@ export default function ArchitecturePage() {
       {/* Section 1: Templatised Routes */}
       <section className="mb-16">
         <SectionAnchor id="templatised-routes">1. Templatised Routes</SectionAnchor>
-        <p className="text-neutral-400 leading-relaxed mb-6">
+        <p className="text-neutral-600 dark:text-neutral-400 leading-relaxed mb-6">
           Every BRIEF that enters the queue is first checked against YAML-defined
           workflow templates. PRISM, the routing agent, reads the BRIEF payload
           and attempts to match it against a known workflow pattern before falling
@@ -205,7 +205,7 @@ export default function ArchitecturePage() {
           predictable, and logged.
         </p>
 
-        <h3 className="text-lg font-semibold text-neutral-200 mb-3">
+        <h3 className="text-lg font-semibold text-neutral-800 dark:text-neutral-200 mb-3">
           Three Core Routes
         </h3>
         <div className="space-y-4 mb-6">
@@ -213,7 +213,7 @@ export default function ArchitecturePage() {
             <p className="font-mono text-sm text-[var(--accent-green)] mb-1">
               prism-routing
             </p>
-            <p className="text-sm text-neutral-400">
+            <p className="text-sm text-neutral-600 dark:text-neutral-400">
               The default dispatch workflow. COMPASS classifies the BRIEF,
               PRISM matches it against the capability matrix, and the work is
               dispatched to the best-fit agent. Handles 70% of all BRIEFs.
@@ -223,7 +223,7 @@ export default function ArchitecturePage() {
             <p className="font-mono text-sm text-[var(--accent-green)] mb-1">
               gap-resolution
             </p>
-            <p className="text-sm text-neutral-400">
+            <p className="text-sm text-neutral-600 dark:text-neutral-400">
               Triggered when the system identifies missing capabilities or
               skills. Analyses the gap, generates a resolution BRIEF, and
               dispatches it to the agent with the closest skill match.
@@ -233,7 +233,7 @@ export default function ArchitecturePage() {
             <p className="font-mono text-sm text-[var(--accent-green)] mb-1">
               build-validation
             </p>
-            <p className="text-sm text-neutral-400">
+            <p className="text-sm text-neutral-600 dark:text-neutral-400">
               Post-build verification workflow. Runs Lighthouse checks,
               HTTP 200 validation, and artifact registration before any BRIEF
               can be marked as COMPLETED.
@@ -241,25 +241,25 @@ export default function ArchitecturePage() {
           </div>
         </div>
 
-        <h3 className="text-lg font-semibold text-neutral-200 mb-3">
+        <h3 className="text-lg font-semibold text-neutral-800 dark:text-neutral-200 mb-3">
           Workflow Matrix
         </h3>
-        <p className="text-neutral-400 leading-relaxed mb-4">
-          The full workflow graph spans <strong className="text-neutral-200">72 nodes</strong> and{" "}
-          <strong className="text-neutral-200">99 edges</strong>, encoded in YAML
+        <p className="text-neutral-600 dark:text-neutral-400 leading-relaxed mb-4">
+          The full workflow graph spans <strong className="text-neutral-800 dark:text-neutral-200">72 nodes</strong> and{" "}
+          <strong className="text-neutral-800 dark:text-neutral-200">99 edges</strong>, encoded in YAML
           and validated against{" "}
-          <code className="text-xs bg-neutral-900 px-1.5 py-0.5 rounded font-mono">
+          <code className="text-xs bg-neutral-100 dark:bg-neutral-900 px-1.5 py-0.5 rounded font-mono">
             workflow-v1.schema.yaml
           </code>
           . Each node is an agent, skill, or decision gate. Each edge is a
           dependency, data flow, or control-flow transition.
         </p>
 
-        <div className="p-4 rounded-lg border border-dashed border-neutral-700 bg-neutral-900/50 mb-6">
+        <div className="p-4 rounded-lg border border-dashed border-neutral-300 dark:border-neutral-700 bg-neutral-100 dark:bg-neutral-900/50 mb-6">
           <p className="text-sm text-neutral-500 font-mono mb-2">
             Architecture precedents
           </p>
-          <ul className="space-y-2 text-sm text-neutral-400">
+          <ul className="space-y-2 text-sm text-neutral-600 dark:text-neutral-400">
             <li>
               <ExternalLink href="https://www.langchain.com/langgraph">
                 LangGraph state machines
@@ -289,14 +289,14 @@ export default function ArchitecturePage() {
       {/* Section 2: Magentic Mode */}
       <section className="mb-16">
         <SectionAnchor id="magentic-mode">2. Magentic Mode</SectionAnchor>
-        <p className="text-neutral-400 leading-relaxed mb-6">
+        <p className="text-neutral-600 dark:text-neutral-400 leading-relaxed mb-6">
           When no template matches, the system falls back to dynamic capability
           routing. We call this &quot;magentic mode&quot; because the BRIEF is attracted
           to the agent with the strongest capability match, like a magnet finding
           its pole.
         </p>
 
-        <h3 className="text-lg font-semibold text-neutral-200 mb-3">
+        <h3 className="text-lg font-semibold text-neutral-800 dark:text-neutral-200 mb-3">
           The Routing Chain
         </h3>
         <div className="flex flex-col md:flex-row gap-3 mb-6">
@@ -324,10 +324,10 @@ export default function ArchitecturePage() {
               key={s.step}
               className="flex-1 p-4 rounded-lg border border-[var(--border)] bg-[var(--surface)]"
             >
-              <p className="text-xs font-mono text-neutral-600 mb-1">
+              <p className="text-xs font-mono text-neutral-500 dark:text-neutral-600 mb-1">
                 Step {s.step}
               </p>
-              <p className="font-semibold text-neutral-200 text-sm">
+              <p className="font-semibold text-neutral-800 dark:text-neutral-200 text-sm">
                 {s.agent}: {s.action}
               </p>
               <p className="text-xs text-neutral-500 mt-1">{s.detail}</p>
@@ -335,13 +335,13 @@ export default function ArchitecturePage() {
           ))}
         </div>
 
-        <h3 className="text-lg font-semibold text-neutral-200 mb-3">
+        <h3 className="text-lg font-semibold text-neutral-800 dark:text-neutral-200 mb-3">
           Dispatch Payload
         </h3>
-        <p className="text-neutral-400 leading-relaxed mb-4">
+        <p className="text-neutral-600 dark:text-neutral-400 leading-relaxed mb-4">
           The magentic routing chain returns a structured dispatch object:
         </p>
-        <pre className="bg-neutral-900 border border-[var(--border)] rounded-lg p-4 text-sm font-mono text-neutral-300 overflow-x-auto mb-6">
+        <pre className="bg-neutral-100 dark:bg-neutral-900 border border-[var(--border)] rounded-lg p-4 text-sm font-mono text-neutral-700 dark:text-neutral-300 overflow-x-auto mb-6">
 {`{
   "agent": "FORGE",
   "skills": ["web-builder", "github-automation"],
@@ -352,7 +352,7 @@ export default function ArchitecturePage() {
 }`}
         </pre>
 
-        <h3 className="text-lg font-semibold text-neutral-200 mb-3">
+        <h3 className="text-lg font-semibold text-neutral-800 dark:text-neutral-200 mb-3">
           Dispatch Patterns
         </h3>
         <div className="space-y-2 mb-6">
@@ -374,16 +374,16 @@ export default function ArchitecturePage() {
               <code className="text-[var(--accent-green)] font-mono shrink-0 pt-0.5">
                 {p.pattern}
               </code>
-              <p className="text-neutral-400">{p.desc}</p>
+              <p className="text-neutral-600 dark:text-neutral-400">{p.desc}</p>
             </div>
           ))}
         </div>
 
-        <div className="p-4 rounded-lg border border-dashed border-neutral-700 bg-neutral-900/50">
+        <div className="p-4 rounded-lg border border-dashed border-neutral-300 dark:border-neutral-700 bg-neutral-100 dark:bg-neutral-900/50">
           <p className="text-sm text-neutral-500 font-mono mb-2">
             Industry parallels
           </p>
-          <ul className="space-y-2 text-sm text-neutral-400">
+          <ul className="space-y-2 text-sm text-neutral-600 dark:text-neutral-400">
             <li>
               <ExternalLink href="https://www.crewai.com/">
                 CrewAI delegation patterns
@@ -413,7 +413,7 @@ export default function ArchitecturePage() {
       {/* Section 3: Why Both */}
       <section className="mb-16">
         <SectionAnchor id="why-both">3. Why Both</SectionAnchor>
-        <p className="text-neutral-400 leading-relaxed mb-6">
+        <p className="text-neutral-600 dark:text-neutral-400 leading-relaxed mb-6">
           Most orchestration systems pick one approach: either rigid templates or
           fully dynamic routing. We run both because they solve different problems
           and, critically, they feed each other.
@@ -421,10 +421,10 @@ export default function ArchitecturePage() {
 
         <div className="grid md:grid-cols-2 gap-4 mb-6">
           <div className="p-5 rounded-lg border border-[var(--border)] bg-[var(--surface)]">
-            <h4 className="font-semibold text-neutral-200 mb-2">
+            <h4 className="font-semibold text-neutral-800 dark:text-neutral-200 mb-2">
               Templates: Known Patterns
             </h4>
-            <ul className="space-y-1.5 text-sm text-neutral-400">
+            <ul className="space-y-1.5 text-sm text-neutral-600 dark:text-neutral-400">
               <li>Fast: no classification overhead</li>
               <li>Deterministic: same input, same route</li>
               <li>Auditable: every step logged against schema</li>
@@ -432,10 +432,10 @@ export default function ArchitecturePage() {
             </ul>
           </div>
           <div className="p-5 rounded-lg border border-[var(--border)] bg-[var(--surface)]">
-            <h4 className="font-semibold text-neutral-200 mb-2">
+            <h4 className="font-semibold text-neutral-800 dark:text-neutral-200 mb-2">
               Magentic: Novel Work
             </h4>
-            <ul className="space-y-1.5 text-sm text-neutral-400">
+            <ul className="space-y-1.5 text-sm text-neutral-600 dark:text-neutral-400">
               <li>Flexible: handles unseen BRIEF types</li>
               <li>Capability-aware: scores agents on skill match</li>
               <li>Self-discovering: finds routes templates miss</li>
@@ -444,26 +444,26 @@ export default function ArchitecturePage() {
           </div>
         </div>
 
-        <h3 className="text-lg font-semibold text-neutral-200 mb-3">
+        <h3 className="text-lg font-semibold text-neutral-800 dark:text-neutral-200 mb-3">
           The Self-Learning Loop
         </h3>
-        <p className="text-neutral-400 leading-relaxed mb-4">
+        <p className="text-neutral-600 dark:text-neutral-400 leading-relaxed mb-4">
           When a magentic route succeeds three times with the same pattern, the
           system promotes it to a template. The BRIEF-to-agent mapping, the skill
           requirements, and the workflow steps are crystallised into a YAML
           definition and added to the template library. What started as a
           dynamic discovery becomes a deterministic fast path.
         </p>
-        <p className="text-neutral-400 leading-relaxed mb-6">
+        <p className="text-neutral-600 dark:text-neutral-400 leading-relaxed mb-6">
           This is how the system grows. Not through manual template authoring,
           but through operational experience that hardens into structure.
         </p>
 
-        <div className="p-4 rounded-lg border border-dashed border-neutral-700 bg-neutral-900/50">
+        <div className="p-4 rounded-lg border border-dashed border-neutral-300 dark:border-neutral-700 bg-neutral-100 dark:bg-neutral-900/50">
           <p className="text-sm text-neutral-500 font-mono mb-2">
             Market context
           </p>
-          <ul className="space-y-2 text-sm text-neutral-400">
+          <ul className="space-y-2 text-sm text-neutral-600 dark:text-neutral-400">
             <li>
               <ExternalLink href="https://www.mckinsey.com/capabilities/quantumblack/our-insights/the-state-of-ai">
                 McKinsey&apos;s State of AI research
@@ -495,10 +495,10 @@ export default function ArchitecturePage() {
       {/* Section 4: Battlefield Visualization */}
       <section className="mb-16">
         <SectionAnchor id="battlefield">4. Battlefield Visualization</SectionAnchor>
-        <p className="text-neutral-400 leading-relaxed mb-6">
+        <p className="text-neutral-600 dark:text-neutral-400 leading-relaxed mb-6">
           The Battlefield is our operations dashboard. At its center is a 3D
           force-directed graph — built with{" "}
-          <code className="text-xs bg-neutral-900 px-1.5 py-0.5 rounded font-mono">
+          <code className="text-xs bg-neutral-100 dark:bg-neutral-900 px-1.5 py-0.5 rounded font-mono">
             react-force-graph-3d
           </code>{" "}
           — that renders every agent, workflow, skill, and BRIEF as a node with
@@ -529,10 +529,10 @@ export default function ArchitecturePage() {
           </div>
         </div>
 
-        <h3 className="text-lg font-semibold text-neutral-200 mb-3">
+        <h3 className="text-lg font-semibold text-neutral-800 dark:text-neutral-200 mb-3">
           Live Edge Activation
         </h3>
-        <p className="text-neutral-400 leading-relaxed mb-4">
+        <p className="text-neutral-600 dark:text-neutral-400 leading-relaxed mb-4">
           When SOVEREIGN dispatches a BRIEF, the structural edges on the graph
           light up in real-time. The edge between SOVEREIGN and the target agent
           pulses. As the agent invokes tools, edges to those skill nodes
@@ -540,10 +540,10 @@ export default function ArchitecturePage() {
           You can watch work flow through the system as it happens.
         </p>
 
-        <h3 className="text-lg font-semibold text-neutral-200 mb-3">
+        <h3 className="text-lg font-semibold text-neutral-800 dark:text-neutral-200 mb-3">
           Self-Observing System
         </h3>
-        <p className="text-neutral-400 leading-relaxed mb-6">
+        <p className="text-neutral-600 dark:text-neutral-400 leading-relaxed mb-6">
           The graph is not a monitoring layer bolted on top. It reads from the
           same RAG entity store and Supabase tables that the agents themselves
           use. SOVEREIGN and the graph see the same data. This means the system
@@ -565,7 +565,7 @@ export default function ArchitecturePage() {
 
       {/* Internal links to blog posts */}
       <section className="border-t border-[var(--border)] pt-10">
-        <h3 className="text-lg font-semibold text-neutral-200 mb-4">
+        <h3 className="text-lg font-semibold text-neutral-800 dark:text-neutral-200 mb-4">
           Related Reading
         </h3>
         <div className="space-y-3">
@@ -573,7 +573,7 @@ export default function ArchitecturePage() {
             href="/blog/why-our-ai-agents-kept-lying-about-completing-tasks"
             className="block p-4 rounded-lg border border-[var(--border)] bg-[var(--surface)] hover:border-[var(--accent-blue)] transition-colors"
           >
-            <p className="text-sm font-medium text-neutral-200">
+            <p className="text-sm font-medium text-neutral-800 dark:text-neutral-200">
               Why Our AI Agents Kept Lying About Completing Tasks
             </p>
             <p className="text-xs text-neutral-500 mt-1">
@@ -585,7 +585,7 @@ export default function ArchitecturePage() {
             href="/blog/sovereign-dispatch-log-building-myself-overnight"
             className="block p-4 rounded-lg border border-[var(--border)] bg-[var(--surface)] hover:border-[var(--accent-blue)] transition-colors"
           >
-            <p className="text-sm font-medium text-neutral-200">
+            <p className="text-sm font-medium text-neutral-800 dark:text-neutral-200">
               SOVEREIGN Dispatch Log: Building Myself Overnight
             </p>
             <p className="text-xs text-neutral-500 mt-1">
@@ -597,7 +597,7 @@ export default function ArchitecturePage() {
             href="/blog/from-8-edges-to-90-watching-an-agent-army-connect"
             className="block p-4 rounded-lg border border-[var(--border)] bg-[var(--surface)] hover:border-[var(--accent-blue)] transition-colors"
           >
-            <p className="text-sm font-medium text-neutral-200">
+            <p className="text-sm font-medium text-neutral-800 dark:text-neutral-200">
               From 8 Edges to 90: Watching an Agent Army Connect
             </p>
             <p className="text-xs text-neutral-500 mt-1">
