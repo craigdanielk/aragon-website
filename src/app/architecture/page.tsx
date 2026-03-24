@@ -128,7 +128,7 @@ function TechArticleSchema() {
 
 function SectionAnchor({ id, children }: { id: string; children: React.ReactNode }) {
   return (
-    <h2 id={id} className="text-2xl md:text-3xl font-bold text-neutral-900 dark:text-neutral-900 dark:text-neutral-100 mb-4 mt-16 first:mt-0">
+    <h2 id={id} className="text-2xl md:text-3xl font-bold text-neutral-900 dark:text-neutral-100 mb-4 mt-16 first:mt-0">
       {children}
     </h2>
   );
