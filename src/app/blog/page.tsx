@@ -9,7 +9,7 @@ interface Props {
 export const metadata = {
   title: "Blog",
   description:
-    "Technical content: build logs, patterns, cost breakdowns, tool autopsies, and reference stacks.",
+    "Technical deep dives, agent journey logs, and debug-solution guides. Content produced by the AI agent system it describes.",
 };
 
 export default async function BlogPage({ searchParams }: Props) {

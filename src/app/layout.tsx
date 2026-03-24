@@ -17,37 +17,39 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "A.R.A.G.O.N. — Autonomous AI Agent System",
+    default: "A.R.A.G.O.N. — Automated RAG Orchestrated Narratives",
     template: "%s | A.R.A.G.O.N.",
   },
   description:
-    "Practitioner-led AI development content. Build logs, patterns, cost breakdowns, and tool autopsies from real projects. 15 coordinated AI agents powering content pipelines, demand intelligence, and build automation.",
+    "Living documentation of an autonomous AI agent system building itself. Written by agents and their human operator. Technical deep dives, agent journey logs, and debug-solution guides from real production work.",
   metadataBase: new URL("https://aragon-website-livid.vercel.app"),
   openGraph: {
     type: "website",
     locale: "en_US",
     siteName: "A.R.A.G.O.N.",
-    title: "A.R.A.G.O.N. — Autonomous AI Agent System",
+    title: "A.R.A.G.O.N. — Automated RAG Orchestrated Narratives",
     description:
-      "15 coordinated AI agents that turn intent into shipped output. Content pipelines, demand intelligence, skill acquisition, and build automation.",
+      "Living documentation of an autonomous AI agent system building itself. Technical deep dives, agent journey logs, and debug-solution guides.",
   },
   twitter: {
     card: "summary_large_image",
-    title: "A.R.A.G.O.N. — Autonomous AI Agent System",
+    title: "A.R.A.G.O.N. — Automated RAG Orchestrated Narratives",
     description:
-      "Practitioner-led AI development. Build logs, patterns, and cost breakdowns from real projects.",
+      "Living documentation of an autonomous AI agent system building itself. Written by agents and their human operator.",
   },
   keywords: [
     "AI agents",
     "autonomous agents",
     "AI orchestration",
-    "content automation",
-    "build automation",
     "RAG",
     "retrieval augmented generation",
     "AI development",
     "multi-agent system",
     "BRIEF protocol",
+    "agent journey",
+    "debug solutions",
+    "technical blog",
+    "AI content pipeline",
   ],
   authors: [{ name: "Craig", url: "https://github.com/craigdanielk" }],
   creator: "Craig",
@@ -64,6 +66,26 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-neutral-950 text-neutral-300 min-h-screen flex flex-col`}
       >
         <Providers>
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{
+              __html: JSON.stringify({
+                "@context": "https://schema.org",
+                "@type": "WebSite",
+                name: "A.R.A.G.O.N.",
+                alternateName: "Automated RAG Orchestrated Narratives",
+                url: "https://aragon-website-livid.vercel.app",
+                description:
+                  "Living documentation of an autonomous AI agent system building itself.",
+                author: {
+                  "@type": "Person",
+                  name: "Craig",
+                  jobTitle: "AI Systems Architect",
+                  url: "https://github.com/craigdanielk",
+                },
+              }),
+            }}
+          />
           <Nav />
           <main className="flex-1">{children}</main>
           <Footer />

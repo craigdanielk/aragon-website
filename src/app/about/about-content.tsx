@@ -10,6 +10,7 @@ const agents = [
   { name: "LORE", role: "Skill librarian — knowledge management and retrieval" },
   { name: "KIRA", role: "E-commerce migration engine" },
   { name: "DELIVER", role: "Demo wrapping and Vercel deployment" },
+  { name: "VERIFY", role: "Quality gate — automated acceptance testing" },
   { name: "HEARTBEAT", role: "Telegram notification bot" },
 ];
 
@@ -26,18 +27,26 @@ export function AboutContent() {
         <RevealOnScroll delay={0.1}>
           <section className="prose prose-neutral dark:prose-invert max-w-none text-base leading-relaxed">
             <p className="text-lg text-neutral-300">
-              I&apos;m Craig — a front-end developer based in Cape Town, building
-              an autonomous AI agent army as an independent venture under Aweku Labs.
+              Craig is an AI Systems Architect building North Star — an
+              autonomous multi-agent system that plans its own sprints,
+              writes its own content, deploys its own code, and watches
+              itself through a 3D force graph. He is based in Cape Town,
+              South Africa.
             </p>
             <p>
-              By day I work as a Front End Associate Developer. By night (and most
-              weekends) I build AI systems that work autonomously — agents that plan
-              sprints, scan markets, generate content, deploy code, and coordinate
-              with each other through a unified RAG memory layer.
+              By day he works as a Front-end Developer at R17 Ventures,
+              building Shopify stores and e-commerce solutions. By night
+              (and most weekends) he builds AI systems that work
+              autonomously — agents that coordinate through a unified
+              RAG memory layer, execute structured BRIEFs, and ship real
+              artifacts with zero human intervention.
             </p>
             <p>
-              The goal is straightforward: exit salary dependency through the first
-              independent client delivery powered entirely by this agent army.
+              The absurdity is not lost on him: a lawn bowling grip
+              inventor who now commands an army of AI agents. But
+              that&apos;s the through-line — start with a weird idea,
+              build it yourself, ship it globally, iterate on what
+              works.
             </p>
           </section>
         </RevealOnScroll>
@@ -47,9 +56,18 @@ export function AboutContent() {
             <h2 className="text-3xl font-semibold text-neutral-100 mb-6">
               The Agent Army
             </h2>
+            <p className="text-base text-neutral-400 mb-4">
+              A coordinated fleet of AI agents, each owning a specific
+              domain. They communicate through RAG, execute BRIEFs, and
+              ship real code. The system watches itself — a 3D force
+              graph visualises every agent connection, every BRIEF
+              flowing through the pipeline.
+            </p>
             <p className="text-base text-neutral-400 mb-8">
-              A coordinated fleet of AI agents, each owning a specific domain.
-              They communicate through RAG, execute BRIEFs, and ship real code.
+              The content you read on this site is produced BY the
+              system it describes. Agents harvest topics from their own
+              development logs, synthesise posts with RAG context, and
+              publish them here automatically.
             </p>
             <div className="grid md:grid-cols-2 gap-4">
               {agents.map((agent) => (
@@ -74,16 +92,18 @@ export function AboutContent() {
             </h2>
             <div className="prose prose-neutral dark:prose-invert max-w-none text-base leading-relaxed">
               <p>
-                Before the agent army, there was Champion Grip — a lawn bowling
-                grip product that grew from a local idea to global distribution.
-                Over 17,500 units shipped worldwide through a partnership with
-                Henselite Australia, the sport&apos;s leading equipment manufacturer.
+                Before the agent army, there was Champion Grip — a lawn
+                bowling grip product that grew from a local idea to
+                global distribution through a partnership with Henselite
+                Australia, the sport&apos;s leading equipment
+                manufacturer.
               </p>
               <p>
-                Champion Grip proved that a single-person operation can build,
-                manufacture, and distribute a physical product globally. The same
-                first-principles thinking now drives the agent army — start small,
-                ship fast, iterate on what works.
+                Champion Grip proved that a single-person operation can
+                design, manufacture, and distribute a physical product
+                worldwide. The same first-principles thinking now drives
+                the agent army — start small, ship fast, iterate on what
+                works.
               </p>
             </div>
           </section>
@@ -96,14 +116,16 @@ export function AboutContent() {
             </h2>
             <div className="prose prose-neutral dark:prose-invert max-w-none text-base leading-relaxed">
               <p>
-                A.R.A.G.O.N. stands for Automated RAG Orchestrated Narratives. It&apos;s
-                both the content engine that generates posts from real development
-                sessions and the site you&apos;re reading now.
+                A.R.A.G.O.N. stands for Automated RAG Orchestrated
+                Narratives. It&apos;s both the content engine that
+                generates posts from real development sessions and the
+                site you&apos;re reading now.
               </p>
               <p>
-                Every post on this site comes from actual work — debugging sessions,
-                architectural decisions, cost analyses, tool evaluations. No guru
-                energy. No hype. Just what worked, what didn&apos;t, and the specific
+                Every post on this site comes from actual work —
+                debugging sessions, architectural decisions, cost
+                analyses, tool evaluations. No guru energy. No hype.
+                Just what worked, what didn&apos;t, and the specific
                 numbers.
               </p>
             </div>

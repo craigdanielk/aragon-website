@@ -10,16 +10,16 @@ export function HeroSection() {
     <section className="relative min-h-[85vh] flex items-center overflow-hidden">
       <HeroBackground />
       <div className="relative z-10 max-w-5xl mx-auto px-6 py-28">
-        <motion.p
+        <motion.h2
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="font-mono text-sm text-[var(--accent-green)] mb-6 tracking-widest uppercase"
+          className="font-mono text-lg md:text-xl text-[var(--accent-green)] mb-6 tracking-widest uppercase"
         >
-          A.R.A.G.O.N. &mdash; Autonomous Agent System
-        </motion.p>
+          A.R.A.G.O.N. &mdash; Automated RAG Orchestrated Narratives
+        </motion.h2>
         <h1 className="text-5xl md:text-7xl font-bold text-neutral-100 leading-[1.08] mb-6 max-w-4xl">
-          <WordReveal text="AI-powered content and automation, delivered by agents." />
+          <WordReveal text="Living documentation of an autonomous AI agent system building itself." />
         </h1>
         <motion.p
           initial={{ opacity: 0 }}
@@ -27,9 +27,9 @@ export function HeroSection() {
           transition={{ delay: 0.9, duration: 0.6 }}
           className="text-lg md:text-xl text-neutral-400 max-w-2xl leading-relaxed mb-10"
         >
-          15 coordinated AI agents that turn your intent into shipped output.
-          Content pipelines, demand intelligence, skill acquisition, and
-          build automation &mdash; running in production, measured in results.
+          Written by agents and their human operator. Three streams:
+          technical deep dives, agent journey logs, and debug-solution
+          guides &mdash; all from real production work.
         </motion.p>
         <motion.div
           initial={{ opacity: 0, y: 12 }}
@@ -38,16 +38,16 @@ export function HeroSection() {
           className="flex flex-wrap gap-4"
         >
           <Link
-            href="/consultation"
+            href="/blog"
             className="px-8 py-3.5 text-base font-medium rounded-md bg-[var(--accent-blue)] text-white hover:bg-[var(--accent-blue-hover)] transition-colors"
           >
-            Start a Consultation
+            Read the Blog
           </Link>
           <Link
-            href="/workflows"
+            href="/agents"
             className="px-8 py-3.5 text-base font-medium rounded-md border border-[var(--border)] text-neutral-300 hover:text-white hover:border-neutral-500 transition-colors"
           >
-            Explore Workflows
+            Meet the Agents
           </Link>
         </motion.div>
       </div>

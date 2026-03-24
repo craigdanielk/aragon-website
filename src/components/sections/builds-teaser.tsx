@@ -7,7 +7,7 @@ const featured = [
   { name: "FORGE", desc: "Build system with BRIEF protocol, 203+ tests", status: "Production" },
   { name: "RECON", desc: "LLM-driven demand intelligence scanner", status: "Production" },
   { name: "ARAGON", desc: "AI content engine and publishing pipeline", status: "Production" },
-  { name: "Champion Grip", desc: "Lawn bowling grip — 17,500+ units globally", status: "Shipped" },
+  { name: "Champion Grip", desc: "Lawn bowling grip — global distribution via Henselite", status: "Shipped" },
 ];
 
 export function BuildsTeaser() {

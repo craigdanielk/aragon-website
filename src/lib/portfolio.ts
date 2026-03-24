@@ -12,9 +12,9 @@ export const portfolioRepos: PortfolioRepo[] = [
   {
     name: "Champion Grip",
     description:
-      "E-commerce product site for lawn bowling grips. 17,500+ units sold globally. Full product catalog with variant selection, responsive design, and conversion-optimised layout.",
+      "E-commerce product site for lawn bowling grips with global distribution. Full product catalog with variant selection, responsive design, and conversion-optimised layout.",
     category: "web-platform",
-    highlights: ["17,500+ units sold", "Product catalog", "Conversion-optimised"],
+    highlights: ["Global distribution", "Product catalog", "Conversion-optimised"],
     techStack: ["Next.js 16", "React 19", "Tailwind CSS", "Vercel"],
     url: "https://champion-grip-demo.vercel.app",
     github: "https://github.com/craigdanielk/champion-grip-demo",

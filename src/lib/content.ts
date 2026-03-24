@@ -31,6 +31,8 @@ function getPostsFromDir(section: "blog" | "conversations"): Post[] {
         win: data.win || false,
         status: data.status || "published",
         readingTime: stats.text,
+        heroImage: data.heroImage,
+        ogImage: data.ogImage,
       };
 
       return { meta, content };

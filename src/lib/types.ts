@@ -15,6 +15,8 @@ export interface PostMeta {
   win?: boolean;
   status: "draft" | "published";
   readingTime?: string;
+  heroImage?: string;
+  ogImage?: string;
 }
 
 export interface Post {

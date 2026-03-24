@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import Image from "next/image";
 import { getBlogPosts, getPostBySlug } from "@/lib/content";
 import { ArticleSchema } from "@/components/schema-org";
 import { PostRenderer } from "@/components/post-renderer";
@@ -26,6 +27,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       description: post.meta.excerpt,
       type: "article",
       publishedTime: post.meta.date,
+      ...(post.meta.ogImage && {
+        images: [{ url: post.meta.ogImage, width: 1200, height: 630 }],
+      }),
     },
   };
 }
@@ -63,6 +67,18 @@ export default async function BlogPost({ params }: Props) {
         <h1 className="text-2xl text-neutral-100 leading-tight">
           {post.meta.title}
         </h1>
+        {post.meta.heroImage && (
+          <div className="mt-6 rounded-lg overflow-hidden">
+            <Image
+              src={post.meta.heroImage}
+              alt={post.meta.title}
+              width={1200}
+              height={630}
+              className="w-full h-auto"
+              priority
+            />
+          </div>
+        )}
       </header>
 
       <div className="prose prose-neutral dark:prose-invert max-w-none">
