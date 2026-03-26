@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getSupabaseClient } from "@/lib/supabase";
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
@@ -30,7 +31,9 @@ export async function POST(request: Request) {
 
     if (!ANTHROPIC_API_KEY) {
       // Fallback: generate a reasonable scope without AI
-      return NextResponse.json(generateFallbackScope(body));
+      const fallback = generateFallbackScope(body);
+      await persistConsultation(body, fallback);
+      return NextResponse.json(fallback);
     }
 
     const prompt = `You are a technical project scoping assistant. Analyse the following project request and provide a structured scope assessment.
@@ -66,14 +69,18 @@ Be realistic and specific. Base estimates on actual development work, not AI hyp
 
     if (!response.ok) {
       console.error("Anthropic API error:", response.status);
-      return NextResponse.json(generateFallbackScope(body));
+      const fallback = generateFallbackScope(body);
+      await persistConsultation(body, fallback);
+      return NextResponse.json(fallback);
     }
 
     const data = await response.json();
     const text = data.content?.[0]?.text;
 
     if (!text) {
-      return NextResponse.json(generateFallbackScope(body));
+      const fallback = generateFallbackScope(body);
+      await persistConsultation(body, fallback);
+      return NextResponse.json(fallback);
     }
 
     const parsed = JSON.parse(text);
@@ -82,13 +89,18 @@ Be realistic and specific. Base estimates on actual development work, not AI hyp
     const minPrice = Math.round(hours * hourlyRate * 0.8);
     const maxPrice = Math.round(hours * hourlyRate * 1.2);
 
-    return NextResponse.json({
+    const result = {
       summary: parsed.summary,
       deliverables: parsed.deliverables,
       complexity: parsed.complexity,
       estimatedWeeks: `${Math.ceil(hours / 40)}-${Math.ceil(hours / 30)} weeks`,
       priceRange: `$${minPrice.toLocaleString()} - $${maxPrice.toLocaleString()}`,
-    });
+    };
+
+    // Persist to Supabase (non-blocking — don't fail the response if DB is down)
+    await persistConsultation(body, result);
+
+    return NextResponse.json(result);
   } catch (error) {
     console.error("Consultation API error:", error);
     return NextResponse.json(
@@ -135,4 +147,44 @@ function generateFallbackScope(body: IntakeData) {
     estimatedWeeks: `${Math.ceil(hours / 40)}-${Math.ceil(hours / 30)} weeks`,
     priceRange: `$${minPrice.toLocaleString()} - $${maxPrice.toLocaleString()}`,
   };
+}
+
+async function persistConsultation(
+  body: IntakeData,
+  result: { summary: string; deliverables: string[]; complexity: string; estimatedWeeks: string; priceRange: string }
+) {
+  try {
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      console.log("Consultation intake (no Supabase):", {
+        email: body.email,
+        name: body.name,
+        projectType: body.projectType,
+      });
+      return;
+    }
+
+    const { error } = await supabase.from("phase0_intakes").insert({
+      business_name: body.name,
+      contact_email: body.email,
+      conversation_history: [
+        {
+          role: "user",
+          content: `Project Type: ${body.projectType}\nDescription: ${body.description}\nTimeline: ${body.timeline}\nBudget: ${body.budget || "Not specified"}`,
+        },
+        {
+          role: "assistant",
+          content: `Summary: ${result.summary}\nDeliverables: ${result.deliverables.join(", ")}\nComplexity: ${result.complexity}\nEstimated: ${result.estimatedWeeks}\nPrice: ${result.priceRange}`,
+        },
+      ],
+      proposal: result,
+      status: "new",
+    });
+
+    if (error) {
+      console.error("Failed to persist consultation:", error);
+    }
+  } catch (err) {
+    console.error("Consultation persistence error:", err);
+  }
 }

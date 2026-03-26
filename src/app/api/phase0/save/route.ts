@@ -43,6 +43,7 @@ export async function POST(request: Request) {
         gaps: body.gaps || null,
         proposal: body.proposal || null,
         status: "new",
+        updated_at: new Date().toISOString(),
       })
       .select("id")
       .single();

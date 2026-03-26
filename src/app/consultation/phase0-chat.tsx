@@ -428,8 +428,9 @@ export function Phase0Chat() {
 
   const handleSave = async (email: string, businessName: string) => {
     setSaving(true);
+    setError("");
     try {
-      await fetch("/api/phase0/save", {
+      const res = await fetch("/api/phase0/save", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -441,9 +442,19 @@ export function Phase0Chat() {
           proposal: null,
         }),
       });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "Failed to save consultation");
+      }
+
       setViewState("complete");
-    } catch {
-      setError("Failed to save. You can still download the document.");
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? `${err.message}. You can still download the document.`
+          : "Failed to save. You can still download the document."
+      );
     } finally {
       setSaving(false);
     }
