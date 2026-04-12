@@ -1,0 +1,228 @@
+---
+title: "The Three-Tier State Architecture for AI Agent Systems"
+date: "2026-04-12"
+slug: "gitops-rag-supabase-pattern"
+section: "blog"
+pillar: "operations"
+excerpt: "Most AI agent systems fail for reasons that have nothing to do with the models they use. The models are capable. The failures come from state management."
+tags: ['aragon', 'fractalos', 'blog', 'devops', 'supabase', 'database']
+status: "published"
+---
+
+*Why Git, vector search, and Postgres each do exactly one job — and why collapsing them breaks everything.*
+
+---
+
+Most AI agent systems fail for reasons that have nothing to do with the models they use. The models are capable. The failures come from state management.
+
+State is where agents go wrong. They don't know what they're supposed to do (configuration state). They don't remember what they've done (memory state). They lose track of work in progress (execution state). Fix the state architecture and most of the hard problems become easy.
+
+After running a multi-agent orchestration system through 750+ task executions, one architecture has proven stable: three tiers, each with a single responsibility, each irreplaceable.
+
+- **Git**: source of truth
+- **Vector search**: semantic cache
+- **Postgres**: execution state
+
+This post explains why each tier exists, what each one uniquely provides, and what breaks when you try to collapse any two of them.
+
+---
+
+## The Problem With Naive Approaches
+
+Before getting to the solution, it helps to understand why simpler approaches fail.
+
+### Everything in the database
+
+The first instinct is to put everything in Postgres. Agents read their configuration from the database. Capabilities are stored in tables. Skills are rows. Workflows are JSON columns.
+
+This seems clean. One query, full system state.
+
+It breaks in three ways:
+
+First, there is no history. Databases are optimized for current state. Understanding how the system configuration changed over the past six weeks requires either an audit log (now you have two systems) or version columns (now you have a bad version control system built inside Postgres).
+
+Second, there is no reviewability. When an agent's behavior changes because its configuration changed, you cannot do a `git diff` to see what changed. You cannot bisect to find when a regression was introduced. You cannot require a code review before a configuration change takes effect. Operations becomes a black box.
+
+Third, there is no schema enforcement without schema enforcement. YAML files with a JSON Schema validator applied on write give you structured type checking at the source. A JSON column in Postgres gives you whatever anyone happened to put in it.
+
+### Everything in files
+
+The opposite failure: put everything in flat files. Configuration in YAML, memory in JSON, task state in text files.
+
+This also fails. Files are not good queues. They don't have atomic compare-and-swap operations. They don't handle concurrent writes from multiple agents. You cannot efficiently query "give me all tasks that are QUEUED, not blocked, ordered by priority score" from a directory of YAML files without reading all of them on every poll cycle.
+
+Files are a bad database. Databases are a bad version control system. The three-tier architecture recognizes this and assigns each responsibility to the tool designed for it.
+
+---
+
+## Tier One: Git as Source of Truth
+
+Git holds everything that defines what the system *is* — not what it's doing right now, but its permanent, versioned identity.
+
+In a well-structured AI agent system, that means:
+
+- **Agent definitions**: declared capabilities, required skills, tool access, model preferences, rate limits
+- **Workflow schemas**: step sequences, input/output contracts, dependency ordering
+- **Skill registry**: what skills exist, their parameters, their execution requirements
+- **Capability matrix**: which agents can execute which workflows
+- **Schemas**: the JSON Schema validators that enforce structure on all of the above
+- **Commands**: slash commands, runbooks, SOPs — the operator interface
+
+These are definitions. They change slowly. They require review. They need history. Git is exactly the right home for them.
+
+The key discipline: **nothing exists in the system unless it has a schema-validated file in the repository.** This is strict. If you want to add an agent, you write a YAML file, run the validator, and commit. If you want to add a skill, same process. The repository is the single source of truth for what the system is capable of.
+
+This discipline makes several hard problems easy:
+
+**Drift detection becomes mechanical.** A reconciler script reads the repository state and queries the live execution state. Any discrepancy is a drift. Orphaned database records — agents that exist in execution state but have no corresponding definition file — are flagged automatically. No manual auditing required.
+
+**Rollback is real rollback.** If a workflow change causes failures, you `git revert` the commit. The system state rolls back to the previous known-good configuration. No database migrations to reverse, no JSON to manually edit, no mystery about what changed.
+
+**Peer review works.** An agent definition change is a pull request. It has a diff. It can be commented on, approved, or rejected. The enforcement happens at the commit level, not after the fact.
+
+**Audit trails are free.** `git log agents/COORDINATOR.yaml` shows every change to the coordinator agent, when it happened, and what the message said. No additional audit infrastructure required.
+
+The failure mode to avoid: treating Git as a deployment artifact rather than as the operational source of truth. If your agents read configuration from the database at runtime and the database is only populated by a deployment script that reads from Git, you have removed Git from the critical path. Now Git is documentation. Now you have one tier, not two. The accountability guarantees go away.
+
+---
+
+## Tier Two: Vector Search as Semantic Cache
+
+Git stores what the system *is*. Vector search stores what the system *knows*.
+
+These are different things. A workflow definition tells an agent what steps to execute. A retrospective from a previous session tells an agent what went wrong the last time those steps ran, what edge case caused a failure, and what the successful workaround was. The workflow definition is in Git. The retrospective is in the semantic layer.
+
+This tier holds:
+- Retrospective documents from past execution sessions
+- Research notes and architectural decisions
+- Agent context — accumulated knowledge a specific agent has built up over many sessions
+- Cross-project patterns and reusable solutions
+- Institutional knowledge that hasn't been formalized into a schema yet
+
+The purpose is retrieval by meaning rather than by exact key. An agent working on a database migration doesn't know the exact title of the retrospective from three months ago that documented a similar migration. It knows the concepts involved. Vector search finds relevant prior art based on semantic similarity. The agent gets context it couldn't have looked up by name.
+
+**Why this is a cache, not a source of truth**: vector search indexes can be rebuilt. If the index is lost or corrupted, the source documents (retrospectives in Git, conversation logs in persistent storage) still exist. The semantic layer makes truth accessible quickly; it doesn't hold truth exclusively.
+
+**Why this is not a database**: you don't query the semantic layer for "all retrospectives where status = FAILED." You query it for "what do we know about Supabase migration failures?" The retrieval modality is approximate, contextual, and meaning-oriented. That is a feature, not a limitation. Databases can store every retrospective ever written; they cannot surface the three most relevant ones for a specific problem.
+
+**The anti-pattern to avoid**: using the semantic layer as the primary store for structured data. A brief (task definition) is structured data with a schema. It belongs in Postgres, with the brief ID as its primary key. A retrospective is unstructured knowledge. It belongs in the semantic layer. Putting briefs in vector search means you can't efficiently query by status, priority, or blocked_by — all of which require exact structured lookups. Putting retrospectives exclusively in Postgres means every agent has to read every retrospective on every query to find relevant ones.
+
+The correct model: structured data lives in Postgres with a schema and primary key. Unstructured knowledge lives in the semantic layer, indexed by content. Agents use both.
+
+---
+
+## Tier Three: Postgres as Execution State
+
+The third tier holds everything about what the system is *doing right now*.
+
+- The task queue (briefs table)
+- Execution telemetry (every tool call, model invocation, token count)
+- Artifacts produced by agents
+- System events (sprint starts, checkpoint saves, drift detections)
+- Agent sessions and claimed work
+
+This is operational data. It changes constantly. It needs ACID guarantees. It needs indexes for efficient priority-ordered queries. It needs foreign keys for consistency enforcement.
+
+The brief queue is the critical piece. A well-designed brief row looks like this:
+
+```sql
+CREATE TABLE briefs (
+    id          BIGSERIAL PRIMARY KEY,
+    brief_name  TEXT NOT NULL UNIQUE,
+    tenant_id   TEXT NOT NULL DEFAULT 'default',
+    status      TEXT NOT NULL DEFAULT 'QUEUED'
+                    CHECK (status IN ('QUEUED','CLAIMED','COMPLETED','FAILED','BLOCKED')),
+    priority    INTEGER NOT NULL DEFAULT 50,
+    wsjf_score  NUMERIC GENERATED ALWAYS AS (
+                    (business_value * time_criticality * system_leverage)::numeric
+                    / NULLIF(job_size, 0)
+                ) STORED,
+    blocked_by  JSONB DEFAULT '[]',
+    claimed_by  TEXT,
+    claimed_at  TIMESTAMPTZ,
+    completed_at TIMESTAMPTZ,
+    payload     JSONB NOT NULL,
+    ...
+);
+```
+
+The `wsjf_score` is a generated column — computed from four Fibonacci-constrained input values (1, 2, 3, 5, 8, 13, 21). Agents cannot write to it directly. The score is always correct relative to the inputs. This prevents score manipulation and ensures the priority ordering is derived from declared values, not overridden by hand.
+
+The `blocked_by` array is a JSONB column holding brief IDs. A brief cannot be claimed if any ID in this array references an incomplete brief. The coordinator checks this on every poll cycle:
+
+```sql
+SELECT * FROM briefs
+WHERE status = 'QUEUED'
+  AND tenant_id = $1
+  AND (
+    blocked_by = '[]'::jsonb
+    OR NOT EXISTS (
+      SELECT 1 FROM jsonb_array_elements_text(blocked_by) AS dep_id
+      JOIN briefs b2 ON b2.id = dep_id::bigint
+      WHERE b2.status != 'COMPLETED'
+    )
+  )
+ORDER BY wsjf_score DESC NULLS LAST
+LIMIT 3;
+```
+
+This is a dependency-aware priority queue, implemented entirely in SQL. No external queue infrastructure. No Redis. No SQS. Postgres handles it.
+
+**Why not a purpose-built queue (Celery, SQS, etc.)?** Because the task definitions need to live alongside the execution state. A brief isn't just a job ID and a payload — it's a first-class record with a lifecycle, attached artifacts, audit history, and foreign key relationships to agents, sessions, and system events. Standard queues don't support this. Postgres does, and the query language is powerful enough to express the dependency logic.
+
+---
+
+## What Happens When You Collapse Tiers
+
+The three-tier architecture feels like overhead until you've lived through the collapses.
+
+**Collapse Git + Postgres**: store agent configuration in the database. Now agent changes happen outside version control. You lose drift detection, rollback, peer review, and audit trails. Six months in, you don't know why an agent is behaving differently than it was before, because there's no history of its configuration.
+
+**Collapse vector search + Git**: store retrospectives as Markdown files only, no semantic indexing. Now agents can't retrieve relevant context efficiently. Every agent starts every session without memory of what the system learned before. You rebuild institutional knowledge from scratch repeatedly. The system doesn't compound.
+
+**Collapse vector search + Postgres**: store retrospectives as text columns in a table. Now you've built a bad search engine in Postgres. Full-text search is possible but lacks semantic understanding. An agent asking "what do we know about authentication failures in edge functions?" gets literal keyword matches, not semantically relevant prior art.
+
+Each collapse trades a capability for apparent simplicity. The simplicity is short-lived. The capability loss compounds.
+
+---
+
+## The Integration Point
+
+The three tiers interact at the reconciler.
+
+The reconciler runs at session start. It reads:
+1. All YAML definitions from the repository (Git tier)
+2. Current execution state from Postgres
+3. Optionally queries the semantic layer for recent context
+
+It compares declared state (what the YAML files say the system is) against actualized state (what's running, what briefs are in what states, what agents have claimed what work). Any discrepancy is a drift.
+
+Common drifts:
+- Agent file deleted from Git but records still in execution state
+- Skill referenced in an agent YAML that doesn't have a corresponding skill definition file
+- Brief in QUEUED status blocked by a brief that is COMPLETED (stale blocked_by reference)
+- Workflow in the capability matrix that has no workflow YAML
+
+The reconciler surfaces these. Automated fixes handle the obvious ones (clear stale blocked_by references). Human attention handles the structural ones (missing skill definitions, deleted agent files with orphaned execution records).
+
+The reconciler is what makes Git the actual source of truth, rather than just the nominal one.
+
+---
+
+## Summary
+
+The three-tier architecture separates three fundamentally different kinds of state that require different guarantees:
+
+| Tier | What it holds | Key guarantee | Failure without it |
+|------|--------------|---------------|-------------------|
+| Git | Definitions, schemas, capabilities | Versioned, reviewable, driftable source of truth | Configuration chaos, no rollback, no audit |
+| Vector search | Knowledge, context, retrospectives | Semantic retrieval by meaning | Agents without memory, no compounding |
+| Postgres | Queue, telemetry, artifacts, sessions | ACID, indexed queries, dependency ordering | No reliable task coordination, no execution history |
+
+Each tier is irreplaceable. Each tier does exactly one job. The temptation to collapse them into fewer systems is real and consistently leads to losing the properties that made the architecture work.
+
+Build the three tiers. Keep them separate. Let each one be excellent at what it does.
+
+---
+
+*This architecture has been running in production since late 2025 with 750+ briefs executed across a multi-agent orchestration system. The patterns described here are operational, not theoretical.*

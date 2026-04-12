@@ -1,0 +1,236 @@
+---
+title: "Orphaned Skills: The Quiet Technical Debt That Breaks AI Agent Systems"
+date: "2026-04-12"
+slug: "orphaned-skills-registry-debt"
+section: "blog"
+pillar: "operations"
+excerpt: "There is a form of technical debt specific to AI agent systems that has no good name in the literature. I've started calling it *registry drift* — the accumulat..."
+tags: ['aragon', 'fractalos', 'blog', 'automation', 'skills', 'registry']
+status: "published"
+---
+
+*Skills that exist but nobody claims. Agents that claim skills that don't exist. Here's how to detect, measure, and fix registry drift before it breaks your orchestration.*
+
+---
+
+## The Problem
+
+There is a form of technical debt specific to AI agent systems that has no good name in the literature. I've started calling it *registry drift* — the accumulated divergence between what a system's registry says it can do and what it can actually execute.
+
+The most common manifestation: orphaned skills.
+
+A skill is a declared capability — a named, reusable function that agents can invoke. In a well-structured system, skills are defined in a registry (typically a YAML file), and agents declare in their own definition files which skills they have access to. The relationship is explicit and bidirectional: the skill knows it exists, and the agent knows it can use it.
+
+Orphaned skills occur in two directions:
+
+**Type A: Skill exists in registry, but no agent claims it.** The skill was defined once, perhaps for a specific project that was later deprecated. The agent that used it was removed. The skill definition remains. It sits in the registry doing nothing, but it's not obviously wrong — it's just unused.
+
+**Type B: Agent declares a skill that doesn't exist in the registry.** Someone added a capability to an agent's YAML file, or the skill was renamed, or the skill was removed from the registry without updating the agent that referenced it. Now the agent believes it can do something it can't.
+
+Type A is waste. Type B is a bug.
+
+---
+
+## Why This Accumulates
+
+Registry drift is not the result of carelessness. It accumulates through a set of structural dynamics that operate even in well-maintained systems.
+
+**The capability matrix is modified more often than the registry.** When an agent is given a new responsibility, the agent's YAML is updated. The capability matrix (which maps workflows to agents) is updated. The skills registry — which should also be updated — is often left for later. "Later" compounds.
+
+**Skills are cheaper to create than to deprecate.** Adding a skill to the registry takes a few YAML lines. Deprecating one safely requires checking every agent file that might reference it, searching the capability matrix, scanning workflow definitions, and verifying that nothing in the execution queue is waiting on that skill. The asymmetry means skills accumulate.
+
+**Agent refactoring orphans skill references.** An agent is refactored, split into two agents, or renamed. The new agent files are carefully written. The skill references in the old agent that now point to the new agent's capabilities are sometimes missed. The old skills are now ghost dependencies.
+
+**Sprints move faster than schema maintenance.** During a focused execution sprint, agents are created, modified, and deployed quickly. The priority is throughput. Schema hygiene is a tax on throughput, so it's deferred. After six weeks of sprints, the accumulated drift can be substantial.
+
+---
+
+## Why It Matters
+
+A single orphaned skill (Type A) is harmless. A single Type B orphan (agent claiming nonexistent skill) is a latent failure waiting for the wrong moment.
+
+The failure mode is not usually dramatic. The agent claims a brief that requires the missing skill. The executor starts execution. At the step that invokes the missing skill, the system encounters a lookup failure: the tool doesn't exist, the function can't be imported, or the workflow step references a capability that has no implementation. The brief fails. The failure message references a skill name that exists nowhere in the registry.
+
+Debugging this is painful because the failure looks like an execution error, not a configuration error. The trail leads to the agent, then to the workflow, then to the skill reference, and only then to the registry gap.
+
+At scale — multiple agents, hundreds of skills, thousands of briefs executed — these failures become noise. Individual failures are resolved ad hoc. The underlying registry drift is never addressed. The debt grows.
+
+---
+
+## The Reconciler Pattern
+
+The solution is automated drift detection: a reconciler that reads the full system state and surfaces discrepancies before they cause failures.
+
+Here is the core logic for a skill drift reconciler:
+
+```python
+import yaml
+from pathlib import Path
+from typing import Dict, Set, List
+
+def load_skill_registry(registry_path: Path) -> Set[str]:
+    """Load all skill names from the skills registry."""
+    with open(registry_path) as f:
+        registry = yaml.safe_load(f)
+    return {skill['name'] for skill in registry.get('skills', [])}
+
+def load_agent_skills(agents_dir: Path) -> Dict[str, Set[str]]:
+    """Load all skill declarations from agent YAML files."""
+    agent_skills = {}
+    for agent_file in agents_dir.glob('*.yaml'):
+        with open(agent_file) as f:
+            agent = yaml.safe_load(f)
+        agent_name = agent.get('name', agent_file.stem)
+        skills = set(agent.get('skills', []))
+        if skills:
+            agent_skills[agent_name] = skills
+    return agent_skills
+
+def detect_drift(registry_path: Path, agents_dir: Path) -> dict:
+    """Detect orphaned skills and ghost skill references."""
+    registry_skills = load_skill_registry(registry_path)
+    agent_skills = load_agent_skills(agents_dir)
+
+    # All skills declared by at least one agent
+    claimed_skills = set()
+    for skills in agent_skills.values():
+        claimed_skills.update(skills)
+
+    # Type A: in registry, unclaimed by any agent
+    orphaned_skills = registry_skills - claimed_skills
+
+    # Type B: claimed by agents but not in registry
+    ghost_references = {}
+    for agent_name, skills in agent_skills.items():
+        ghosts = skills - registry_skills
+        if ghosts:
+            ghost_references[agent_name] = list(ghosts)
+
+    return {
+        'orphaned_skills': sorted(orphaned_skills),      # Type A
+        'ghost_references': ghost_references,             # Type B
+        'healthy_skills': sorted(registry_skills & claimed_skills),
+        'summary': {
+            'registry_total': len(registry_skills),
+            'claimed_total': len(claimed_skills),
+            'orphaned_count': len(orphaned_skills),
+            'ghost_agent_count': len(ghost_references),
+        }
+    }
+```
+
+Running this produces a structured report:
+
+```json
+{
+  "orphaned_skills": [
+    "shopify_metafield_sync",
+    "legacy_csv_import",
+    "old_email_validator"
+  ],
+  "ghost_references": {
+    "ARAGON": ["content_publish_v2", "seo_scorer_v3"],
+    "EXECUTOR": ["workflow_compiler"]
+  },
+  "summary": {
+    "registry_total": 47,
+    "claimed_total": 41,
+    "orphaned_count": 3,
+    "ghost_agent_count": 2
+  }
+}
+```
+
+The report divides the problem cleanly. Type A orphans (orphaned_skills) are candidates for deprecation — either remove them from the registry or find the agent that should claim them. Type B ghosts (ghost_references) are bugs — the agent has been given a capability that doesn't exist.
+
+---
+
+## Extending to Workflows
+
+The same pattern applies to workflows and the capability matrix. A workflow can be orphaned (defined in a YAML file but not referenced in the capability matrix) or ghost-referenced (in the capability matrix but lacking a workflow definition file).
+
+```python
+def detect_workflow_drift(
+    workflows_dir: Path,
+    capability_matrix_path: Path
+) -> dict:
+    """Detect orphaned workflows and ghost matrix entries."""
+    workflow_files = {
+        f.stem for f in workflows_dir.glob('*.yaml')
+    }
+
+    with open(capability_matrix_path) as f:
+        matrix = yaml.safe_load(f)
+
+    matrix_workflows = set(matrix.get('matrix', {}).keys())
+
+    orphaned_workflows = workflow_files - matrix_workflows
+    ghost_matrix_entries = matrix_workflows - workflow_files
+
+    return {
+        'orphaned_workflows': sorted(orphaned_workflows),
+        'ghost_matrix_entries': sorted(ghost_matrix_entries),
+    }
+```
+
+This catches a common failure: a new workflow is defined and the file is committed, but the capability matrix is not updated, so no agent is ever routed to execute it. The workflow exists but is unreachable.
+
+---
+
+## Integration With CI
+
+Drift detection should run automatically, not on-demand. The appropriate integration points:
+
+**Pre-commit hook**: Run a fast drift check before any commit touches agent, skill, or workflow files. If the commit would introduce new Type B ghosts (agent claiming nonexistent skill), reject the commit.
+
+**Session start**: The reconciler runs at the beginning of every agent session, producing a drift report. Any ghost references are surfaced before work begins, so the agent doesn't attempt to execute work it isn't equipped for.
+
+**Scheduled audit**: A daily or weekly audit produces a full drift report, including trend analysis. Are orphaned skills accumulating? Are ghost references appearing in new agents? The trend is as informative as the count.
+
+A simple pre-commit hook:
+
+```bash
+#!/bin/bash
+# .git/hooks/pre-commit
+
+python3 scripts/reconcile.py --check skills --strict
+EXIT_CODE=$?
+
+if [ $EXIT_CODE -ne 0 ]; then
+    echo "ERROR: Registry drift detected. Fix before committing."
+    echo "Run: python3 scripts/reconcile.py --check skills --report"
+    exit 1
+fi
+```
+
+The `--strict` flag causes the reconciler to exit non-zero if any ghost references are found (Type B), but exit zero for Type A orphans (which are waste, not bugs). This distinction matters: ghost references block commits, orphaned skills trigger a warning but don't block.
+
+---
+
+## The Clean-Up Approach
+
+When facing an accumulated drift backlog, a systematic clean-up works better than ad-hoc fixes.
+
+**Step 1: Audit and categorize.** Run the full reconciler report with no filtering. Get the complete picture: all Type A orphans, all Type B ghosts, all orphaned workflows. Sort by impact (ghost references that affect high-WSJF briefs first).
+
+**Step 2: Fix Type B ghosts immediately.** These are bugs. Either add the missing skill to the registry, or remove the incorrect skill claim from the agent definition. Ghost references have a direct failure path. They don't wait for a convenient time.
+
+**Step 3: Evaluate Type A orphans deliberately.** Not all orphaned skills are deletable. Some are dormant — defined for a capability that will be used again next sprint. Others are truly dead. The evaluation should answer: is there a brief in the queue or planned for the next sprint that requires this skill? If no, deprecate it. If yes, find the agent that should claim it and add the declaration.
+
+**Step 4: Prevent recurrence.** Add the pre-commit hook. Schedule the audit. The reconciler doesn't improve the culture; it removes the possibility of committing drift without noticing. That's sufficient.
+
+---
+
+## The Deeper Pattern
+
+Registry drift is a specific instance of a more general problem: any system that has both a declared state (what the config says) and an actualized state (what's actually operational) will accumulate drift between them. The drift accumulates slowly, compounds quietly, and surfaces suddenly as failures.
+
+The reconciler pattern is the solution: a component whose job is to continuously compare declared and actualized state, surface discrepancies, and prevent the gap from growing. Applied to skills and workflows, it catches registry drift. Applied to the full system — agents, briefs, artifacts, execution state — it becomes the primary quality mechanism for the entire orchestration layer.
+
+The oscillation rate between declared and actualized state is the primary quality metric of an autonomous AI system. Drift detection doesn't eliminate the oscillation. It makes the gap visible, which is the prerequisite for keeping it small.
+
+Orphaned skills are the simplest case. Fix them first. The pattern generalizes from there.
+
+---
+
+*The reconciler described here is running in production as part of a multi-agent AI orchestration system. The schema and drift detection logic are available in the system's open codebase.*

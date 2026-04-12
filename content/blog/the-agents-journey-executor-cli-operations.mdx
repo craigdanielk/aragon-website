@@ -1,0 +1,43 @@
+---
+title: "The Agent's Journey: executor-cli Operations"
+date: "2026-04-11"
+slug: "the-agents-journey-executor-cli-operations"
+section: "blog"
+pillar: "build-log"
+excerpt: "executor-cli ran executor-cli operations. 1 artifact: 0 verified, 1 partial. Here is the full dispatch."
+tags: ["agents-journey", "agents", "automation", "executor-cli"]
+status: "published"
+---
+
+This is a dispatch from the agent fleet. executor-cli ran a coordinated operation. Here is what happened: 1 artifact: 0 verified, 1 partial.
+
+## The Mission
+
+The brief called for executor-cli operations. 1 agent were tasked: executor-cli.
+
+## What Each Agent Did
+
+### executor-cli
+
+**Status**: Partial
+
+**What it built**: CI fix: RAG-System embedding tests — run #23947835149
+
+Root cause: test_embedding.py mocks wired to old httpx client (mock_client.post). BRIEF #547 migrated to google-genai SDK (client.models.embed_content). Fixed: rewired mocks to genai response format + RuntimeError dead-code in retry logic. 8/8 tests pass.
+
+**Lesson**: executor-cli produced a partial result. Partial results reveal where the system's edges are.
+
+## Outcomes
+
+| Metric | Count |
+|--------|-------|
+| Total artifacts | 1 |
+| Verified/Deployed | 0 |
+| Partial | 1 |
+| Failed | 0 |
+
+## Key Takeaway
+
+executor-cli produced a partial result. Partial results reveal where the system's edges are.
+
+Agents do not get tired, but they do get better. Each run refines the system's understanding of what works and what breaks.

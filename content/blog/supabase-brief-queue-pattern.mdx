@@ -1,0 +1,312 @@
+---
+title: "Using Postgres as an AI Agent Task Queue"
+date: "2026-04-12"
+slug: "supabase-brief-queue-pattern"
+section: "blog"
+pillar: "operations"
+excerpt: "When building a multi-agent AI orchestration system, the task queue is the central nervous system. Get it wrong and everything else is cosmetic. Get it right an..."
+tags: ['aragon', 'fractalos', 'blog', 'devops', 'supabase', 'database']
+status: "published"
+---
+
+*750+ briefs executed. Here's the schema, the query patterns, and everything that broke along the way.*
+
+---
+
+When building a multi-agent AI orchestration system, the task queue is the central nervous system. Get it wrong and everything else is cosmetic. Get it right and the system can run autonomously, prioritize correctly, handle dependencies, and recover from failures without human intervention.
+
+Most developers reach for a message queue (Redis, SQS, Celery, RabbitMQ) when they need task scheduling. For AI agent systems, this is usually the wrong choice — and I'll explain why Postgres is better before going into the schema that has processed 750+ briefs in production.
+
+---
+
+## Why a Message Queue Fails for AI Agents
+
+Standard message queues are excellent at what they do: high-throughput, at-least-once delivery of opaque payloads to worker processes. The core model is: producer puts message on queue, consumer takes message off queue, acknowledges it, done.
+
+AI agent tasks aren't like that. They have properties that message queues handle badly:
+
+**Dependencies between tasks.** If brief B depends on brief A, B cannot be started until A completes. Standard queues have no notion of this. You'd need a separate dependency tracking system, or you'd need to re-enqueue B every time you check whether A is done. Neither is clean.
+
+**Priority that changes over time.** WSJF (Weighted Shortest Job First) scores change as business context evolves. The relative priority of a brief today may be different from its priority when it was created. Standard queues have immutable ordering at enqueue time or expensive re-queuing operations.
+
+**Rich lifecycle with attached artifacts.** A brief isn't completed when the worker acknowledges the message. It's completed when verified artifacts have been produced, registered, and the completion condition has been checked. Standard queues don't know about artifacts. You'd need to maintain this state separately.
+
+**Querying current state.** "Show me all briefs blocked by brief #847, ordered by priority" is a straightforward SQL query. In a standard queue, it requires building an index over the queue state in a separate database — which means you're using two systems for what Postgres does in one.
+
+**Audit history.** Every status transition for every brief, with timestamps, claiming agent, and resolution details. This is just normal Postgres rows.
+
+The trade-off: Postgres doesn't scale to millions of messages per second. For an AI agent system, that's not the constraint. The constraint is model throughput — you're limited by API rate limits and token budgets, not queue throughput. A system executing dozens to hundreds of briefs per day doesn't need SQS. It needs a queryable, relational, auditable task store.
+
+---
+
+## The Schema
+
+Here is the core briefs table, annotated:
+
+```sql
+-- WSJF component values are Fibonacci-constrained (1,2,3,5,8,13,21)
+-- The score is derived from them, never set directly
+
+CREATE TABLE briefs (
+    id              BIGSERIAL PRIMARY KEY,
+    brief_name      TEXT NOT NULL UNIQUE,  -- human-readable slug, e.g. "CT-001"
+    tenant_id       TEXT NOT NULL DEFAULT 'default',
+
+    -- Lifecycle
+    status          TEXT NOT NULL DEFAULT 'QUEUED'
+                        CHECK (status IN (
+                            'QUEUED',
+                            'CLAIMED',
+                            'COMPLETED',
+                            'FAILED',
+                            'BLOCKED'
+                        )),
+    claimed_by      TEXT,       -- agent identifier
+    claimed_at      TIMESTAMPTZ,
+    completed_at    TIMESTAMPTZ,
+    verification_status TEXT CHECK (verification_status IN ('PASS','FAIL','PENDING')),
+    quality_grade   TEXT CHECK (quality_grade IN ('GREEN','YELLOW','RED')),
+
+    -- WSJF Priority (all values must be in Fibonacci set: 1,2,3,5,8,13,21)
+    business_value      INTEGER NOT NULL DEFAULT 5
+                            CHECK (business_value IN (1,2,3,5,8,13,21)),
+    time_criticality    INTEGER NOT NULL DEFAULT 3
+                            CHECK (time_criticality IN (1,2,3,5,8,13,21)),
+    system_leverage     INTEGER NOT NULL DEFAULT 3
+                            CHECK (system_leverage IN (1,2,3,5,8,13,21)),
+    job_size            INTEGER NOT NULL DEFAULT 5
+                            CHECK (job_size IN (1,2,3,5,8,13,21)),
+    wsjf_score          NUMERIC GENERATED ALWAYS AS (
+                            (business_value::numeric * time_criticality * system_leverage)
+                            / NULLIF(job_size, 0)
+                        ) STORED,
+
+    -- Dependencies
+    blocked_by      JSONB NOT NULL DEFAULT '[]',
+
+    -- Payload
+    payload         JSONB NOT NULL,
+
+    -- Timestamps
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Indexes for queue polling
+CREATE INDEX idx_briefs_status_wsjf
+    ON briefs (status, wsjf_score DESC NULLS LAST)
+    WHERE status = 'QUEUED';
+
+CREATE INDEX idx_briefs_tenant_status
+    ON briefs (tenant_id, status, wsjf_score DESC NULLS LAST);
+```
+
+Several design decisions here deserve explanation.
+
+**WSJF as a generated column.** The `wsjf_score` cannot be written directly. It is computed from four input values. This prevents a class of corruption where someone manually overrides the score to jump the queue. It also means the score is always semantically correct: it reflects declared business value, time urgency, system leverage, and job size — not someone's intuition about which brief should run next.
+
+**Fibonacci constraint on WSJF inputs.** Requiring values to be Fibonacci numbers (1, 2, 3, 5, 8, 13, 21) enforces relative rather than absolute scoring. You can't express the difference between a priority-8 and a priority-9 brief because there is no 9. You're forced to think in relative terms: is this brief "moderately high business value" (8) or "very high business value" (13)? The coarseness is intentional. Fine-grained priority scoring creates false precision and invites gaming.
+
+**`blocked_by` as a JSONB array.** The dependency tracking doesn't require a separate junction table. A brief's dependencies are declared inline as an array of upstream brief IDs. This is readable, writable, and queryable without joins. The downside is you can't enforce foreign key constraints on the JSONB values — but for this use case, the reconciler script handles orphan detection.
+
+---
+
+## The Claim Query
+
+The most important query in the system is the claim query: selecting the highest-priority available brief, marking it claimed, and returning it to the agent in a single atomic operation.
+
+```sql
+WITH next_brief AS (
+    SELECT id
+    FROM briefs
+    WHERE
+        tenant_id = $1
+        AND status = 'QUEUED'
+        AND (
+            blocked_by = '[]'::jsonb
+            OR NOT EXISTS (
+                SELECT 1
+                FROM jsonb_array_elements_text(blocked_by) AS dep_id
+                JOIN briefs b2 ON b2.id = dep_id::bigint
+                WHERE b2.status != 'COMPLETED'
+            )
+        )
+    ORDER BY wsjf_score DESC NULLS LAST, created_at ASC
+    LIMIT 1
+    FOR UPDATE SKIP LOCKED
+)
+UPDATE briefs
+SET
+    status     = 'CLAIMED',
+    claimed_by = $2,
+    claimed_at = NOW(),
+    updated_at = NOW()
+FROM next_brief
+WHERE briefs.id = next_brief.id
+RETURNING briefs.*;
+```
+
+Three things to notice:
+
+**`FOR UPDATE SKIP LOCKED`** is the optimistic locking mechanism. Multiple agents can run this query simultaneously. Each one will claim a different brief because `SKIP LOCKED` causes a transaction to skip rows that are already locked by another transaction. No agent blocks another. No agent claims the same brief twice. This is the standard Postgres pattern for concurrent worker queues and it works exactly as described.
+
+**The dependency check** happens inline in the WHERE clause. A brief is only claimable if its `blocked_by` array is empty OR every ID in the array references a COMPLETED brief. This is a correlated subquery and it's not free — but given the scale (hundreds to thousands of briefs, not millions), it runs fast with the index on status.
+
+**WSJF ordering with created_at as a tiebreaker.** When two briefs have the same WSJF score, the older one is claimed first. This prevents a brief from aging indefinitely at the back of the queue when new high-priority briefs keep arriving.
+
+---
+
+## The Lifecycle
+
+Every brief follows the same state machine:
+
+```
+QUEUED → CLAIMED → COMPLETED
+                 → FAILED
+         → QUEUED (if claim is released without completion)
+QUEUED → BLOCKED (if a dependency is retroactively added)
+```
+
+**QUEUED**: The brief exists and is eligible for claiming. Its dependencies (if any) are complete.
+
+**CLAIMED**: An agent has taken ownership. The `claimed_by` field holds the agent identifier. The `claimed_at` timestamp records when the work started.
+
+**COMPLETED**: The agent finished successfully. `completed_at` is set. The `verification_status` is PASS and `quality_grade` is GREEN. Importantly, the completion trigger requires that an artifact has been registered in the `artifacts` table referencing this brief's ID. You cannot mark a brief COMPLETED without proof of output.
+
+**FAILED**: The agent encountered an error it could not recover from. The failure reason is stored in the payload. Failed briefs can be reset to QUEUED for retry, but this is a deliberate human action, not automatic.
+
+**BLOCKED**: A new dependency was identified after the brief was already in the queue. This rarely happens in a well-planned sprint but occurs during adaptive execution when gap detection creates new briefs mid-sprint that earlier briefs depend on.
+
+The artifact-before-completion rule deserves emphasis. Early versions of this system allowed agents to mark briefs COMPLETED without producing artifacts. This led to phantom completions: the queue showed 100% completion but nothing was actually built. A database trigger was added:
+
+```sql
+CREATE OR REPLACE FUNCTION check_artifact_before_completion()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.status = 'COMPLETED' AND NEW.verification_status = 'PASS' THEN
+        IF NOT EXISTS (
+            SELECT 1 FROM artifacts
+            WHERE brief_name = NEW.brief_name
+            AND status = 'verified'
+        ) THEN
+            RAISE EXCEPTION
+                'Cannot mark brief % COMPLETED without a verified artifact',
+                NEW.brief_name;
+        END IF;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER enforce_artifact_before_completion
+    BEFORE UPDATE ON briefs
+    FOR EACH ROW
+    EXECUTE FUNCTION check_artifact_before_completion();
+```
+
+This trigger has saved more sessions from ghost-completions than any other single schema decision.
+
+---
+
+## Tenant Isolation
+
+Every query in the system filters by `tenant_id`. This provides logical separation between different projects or clients using the same Postgres instance.
+
+The pattern is straightforward:
+
+```sql
+-- All queries include tenant_id in the WHERE clause
+SELECT * FROM briefs
+WHERE tenant_id = 'fractal-os'
+  AND status = 'QUEUED'
+ORDER BY wsjf_score DESC;
+```
+
+Row-level security (RLS) can enforce this at the database level if the system serves untrusted tenants. For a single-operator system, filtering in queries is sufficient and simpler.
+
+The `tenant_id` field also doubles as a sprint or project label. Running a sprint under `tenant_id = 'aragon-launch'` means all briefs, artifacts, and telemetry for that sprint are trivially isolated from other work. Post-sprint reporting is a single filtered query.
+
+---
+
+## Artifacts Table
+
+The companion table to briefs:
+
+```sql
+CREATE TABLE artifacts (
+    id          BIGSERIAL PRIMARY KEY,
+    brief_name  TEXT NOT NULL REFERENCES briefs(brief_name),
+    agent       TEXT NOT NULL,
+    artifact_type TEXT NOT NULL CHECK (
+        artifact_type IN ('file', 'url', 'database_record', 'code', 'report')
+    ),
+    title       TEXT NOT NULL,
+    location    TEXT NOT NULL,  -- file path, URL, or record identifier
+    status      TEXT NOT NULL DEFAULT 'pending'
+                    CHECK (status IN ('pending', 'verified', 'failed')),
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    metadata    JSONB DEFAULT '{}'
+);
+```
+
+An artifact is proof that a brief produced something real. A blog post brief produces a file artifact. An API endpoint brief produces a URL artifact. A database migration brief produces a database_record artifact. The type is constrained by a CHECK clause so you can't produce an "other" artifact — the type must be declared and recognized.
+
+The `location` field is intentionally flexible. For files, it's an absolute path. For URLs, it's a full URL. For database records, it's a table and ID reference formatted as a string. This flexibility means the artifacts table can serve as a unified register of everything the system has ever produced, queryable and linkable.
+
+---
+
+## What 750 Briefs Taught Us
+
+**The WSJF formula exposes disagreements.** When team members (or agents) score a brief differently, the generated column reveals the disagreement. A brief scored as business_value=13 by one agent and business_value=5 by another produces very different WSJF scores. This makes priority disagreements explicit rather than silent.
+
+**Stale blocked_by entries are the most common source of stuck briefs.** A brief that was supposed to be unblocked when its dependency completed — but the dependency's brief_name changed, or the ID was never cleaned up — can sit QUEUED but effectively unclaimed forever. The reconciler script's most valuable check is scanning for briefs with `blocked_by` entries that reference COMPLETED or nonexistent briefs.
+
+**FAILED status requires human attention, not automatic retry.** Early experiments with automatic retry logic led to infinite loops when a brief failed due to a systemic issue (missing tool, wrong schema, API credential expired). The right pattern is: FAILED means stop and notify, not stop and retry. Humans reset failed briefs to QUEUED after understanding and fixing the root cause.
+
+**Session-to-session continuity requires the claimed_by field.** When a long-running brief spans multiple agent sessions, the `claimed_by` field is the thread. Session 1 claims the brief, does partial work, saves a checkpoint artifact. Session 2 resumes by querying for CLAIMED briefs where `claimed_by = 'agent-name'` and restoring from the checkpoint. Without this field, the agent has no way to reconnect to work in progress.
+
+**The system slows with >1000 unarchived briefs.** Not catastrophically, but the dependency subquery in the claim query gets slower as the briefs table grows. The solution is periodic archiving: COMPLETED and FAILED briefs older than 30 days are moved to a `briefs_archive` table. The active briefs table stays small. The archive is available for analytics.
+
+---
+
+## The Coordinator Pattern
+
+The agent that owns the claim loop is the coordinator. It runs on a polling interval (30 seconds is typical) and executes:
+
+```python
+import os
+import time
+from supabase import create_client
+
+client = create_client(os.environ['SUPABASE_URL'], os.environ['SUPABASE_KEY'])
+
+def claim_next_brief(tenant_id: str, agent_name: str):
+    """Claim the highest-priority available brief for this agent."""
+    result = client.rpc('claim_next_brief', {
+        'p_tenant_id': tenant_id,
+        'p_agent_name': agent_name
+    }).execute()
+    return result.data[0] if result.data else None
+
+def poll_loop(tenant_id: str, agent_name: str, interval: int = 30):
+    while True:
+        brief = claim_next_brief(tenant_id, agent_name)
+        if brief:
+            print(f"Claimed: {brief['brief_name']} (WSJF: {brief['wsjf_score']})")
+            execute_brief(brief)
+        else:
+            print(f"Queue empty. Sleeping {interval}s.")
+            time.sleep(interval)
+```
+
+The `claim_next_brief` function is wrapped in a Postgres function (callable via RPC) so the entire select-and-update happens atomically on the database side, not in application code.
+
+---
+
+## The Pattern in One Sentence
+
+Use Postgres as your AI agent task queue when your tasks have dependencies, rich lifecycle state, attached artifacts, and audit requirements — the query power pays for itself within the first hundred briefs.
+
+---
+
+*This queue design is live in production, processing work across a multi-agent AI orchestration system. The schema and patterns described here have been refined over 750+ brief executions across multiple sprints.*
