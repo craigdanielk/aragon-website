@@ -1,0 +1,104 @@
+---
+title: "We Built a CI Gate, Then Deleted It an Hour Later"
+date: "2026-07-28"
+slug: "we-built-a-ci-gate-then-deleted-it"
+section: "blog"
+pillar: "build-log"
+excerpt: "After a deployment provenance incident, we built a proper CI gate to enforce it: a check, a runner, and branch protection. Within an hour we deleted the runner and kept everything else. This is why that swap cost one line — and what it teaches about designing around seams."
+tags: ["ci-cd", "github-actions", "git-hooks", "architecture", "operations", "branch-protection"]
+status: "draft"
+readingTime: "7 min read"
+---
+
+In the [first post of this series](/blog/live-in-production-absent-from-git) we chased down code that ran in production for four days while existing in no git commit. The fix had two halves: commit the code, and then *gate the path* so nothing without provenance could reach `main` again.
+
+So I built the gate. A proper one — a check, a CI runner, and branch protection wired together. It took maybe twenty minutes. Within the hour I deleted a third of it and kept the rest, and the deletion cost exactly one line of config.
+
+That wasn't a failure or a walk-back. It's the whole point of the post. When you build enforcement as separable layers, you can tear out the layer that breaks without disturbing the ones that work. Here's the architecture, the wall we hit, and the question that made the pivot obvious.
+
+## The three-layer gate
+
+Enforcement of "production must come from a reviewed commit" decomposes into three distinct jobs. Conflate them and you get something rigid. Keep them apart and you get something you can re-plumb.
+
+```
+predeploy-guard.sh   →   deploy-guard.yml   →   branch protection
+  (the check)             (runs it in CI)        (makes it mandatory)
+```
+
+**Layer 1 — the check.** A plain bash script, `predeploy-guard.sh`. It is fail-closed: exit 1 if the working tree is dirty or if any source file under the deploy root is untracked — the exact condition that let uncommitted code ship last time. It takes no opinion on *where* it runs.
+
+```bash
+untracked=$(git ls-files --others --exclude-standard -- "$SRC")
+[ -n "$untracked" ] && { echo "BLOCKED: untracked source would ship without a commit"; exit 1; }
+```
+
+**Layer 2 — the runner.** A GitHub Actions workflow, `deploy-guard.yml`. On every pull request and push to `main`, GitHub spins up an ephemeral Ubuntu VM and runs: checkout → the guard → `npm ci` → `next build`. When it finishes it reports a **commit status** named `guard` back to GitHub — a little green or red mark attached to that commit's SHA.
+
+**Layer 3 — the gate.** Branch protection on `main`, configured to *require* the `guard` status to be green before anything merges. No green `guard`, no merge. Plus the cheap structural rails: no force-push, no branch deletion, linear history.
+
+The logic reads cleanly top to bottom: a commit reaching `main` (which auto-deploys to production) must have passed the guard, on a neutral machine the author can't quietly skip.
+
+## The seam that made it all cheap
+
+Look closely at how layer 3 talks to layer 2. Branch protection does **not** know what GitHub Actions is. It knows one thing: *require a commit status named `guard` to be green.*
+
+A commit status is just an API record. Anything holding a token can write one:
+
+```
+POST /repos/{owner}/{repo}/statuses/{sha}
+{ "state": "success", "context": "guard" }
+```
+
+Actions happens to produce that status. But so could a Jenkins box, a shell script on a cron, or a git hook on your laptop. **The status API is the seam** — the narrow, well-defined interface between "something ran the check" and "the gate cares about the result." Neither side knows the other's internals.
+
+That seam is the reason the story has a happy ending.
+
+## The wall
+
+I pushed the workflow, opened the first pull request, and the `guard` check went red in two seconds. Two seconds is far too fast to have run a build. I pulled the job detail:
+
+```
+job: guard
+conclusion: failure
+steps: []
+```
+
+Zero steps. The job didn't fail *a* step — it never ran *any* step. That signature is not a bug in your check; it's the runner failing to start. On a private repository it almost always means one thing: GitHub Actions minutes or billing. Actions was *enabled* on the repo, but the account couldn't schedule a job, so it died before step one.
+
+And here's the trap that had just sprung shut: branch protection was configured to **require** the `guard` status. The status could now never turn green, because the thing that produces it could never run. The gate I had built to protect the repo was now blocking every pull request into it, permanently. I had armed a lock and thrown away the only key.
+
+## The question that dissolved it
+
+The operator asked the question that mattered, and it's the right question to ask of any managed service: *"Why do we need to rely on GitHub Actions instead of just doing whatever it does ourselves?"*
+
+Strip it to first principles. What was Actions actually giving us?
+
+1. **A machine to run the check on.** But the check is a bash script and a build — our own laptop runs both, and did, every time we tested locally.
+2. **A commit status the gate consumes.** This is the only genuinely GitHub-shaped piece — and, as we just saw, the status API is open to anyone.
+
+So of the two things, one we already had, and the other wasn't Actions-specific at all. What Actions *uniquely* provides is **independent, unbypassable execution**: the check runs on a neutral box the committer cannot skip, so "it passed" cannot be faked. That property is real and it matters — for a *team*. For a solo committer, you are the only person who can push, so a check that runs locally before every push gives you nearly the same protection. The only thing you surrender is the guarantee against a deliberate `git push --no-verify`. Discipline instead of enforcement — an acceptable trade when the discipline and the committer are the same person.
+
+## The pivot cost one line
+
+Because the three layers were separate, retiring the broken one touched nothing else:
+
+- **Layer 1, the check** — unchanged. The same `predeploy-guard.sh`.
+- **Layer 2, the runner** — swapped from a cloud VM to a local **`pre-push` hook** that runs the guard and the build before every push. Enabled with one line:
+
+  ```bash
+  git config core.hooksPath .githooks
+  ```
+
+- **Layer 3, the gate** — relaxed to keep only the structural rails (no force-push, no deletion, linear history) and drop the required status that could no longer be produced.
+
+The first push after the change ran the hook, saw a clean tree, built green, and went through. The exact check that was going to run in the cloud now runs on the laptop, for free, a second earlier in the process. And the path back is documented: the moment a teammate joins — or the moment we want the unbypassable guarantee back — we either fix Actions billing and re-require the `guard` status, or have the hook itself POST that status through the seam. No rewrite. The check never moves; only the thing that runs it does.
+
+## The takeaway: build around seams
+
+The reusable lesson isn't "avoid GitHub Actions." Actions is excellent, and for a funded team repo I'd reach for it first. The lesson is about *shape*.
+
+- **Separate the check from the thing that runs it from the thing that enforces it.** Three jobs, three components. A monolith that did all three would have forced a rewrite when one part failed for reasons unrelated to correctness.
+- **Find the seam and keep it narrow.** The commit-status API was the interface between "ran" and "enforced." Because it was a small, standard contract — not a private coupling — either side was replaceable.
+- **A failure in one layer should be a swap, not a teardown.** When the runner died for billing reasons, nothing about the *check* or the *gate* was wrong. Decoupled layers let us treat it as exactly what it was: replace the runner, leave the rest.
+
+We hit a wall that had nothing to do with whether our code was correct, and got past it by changing one line. That's not luck. That's what you get to do when the architecture has seams in the right places.
