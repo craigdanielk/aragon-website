@@ -1,0 +1,101 @@
+---
+title: "Who Can Deploy, and By What Name: RBAC and DNS from First Principles"
+date: "2026-07-28"
+slug: "who-can-deploy-and-by-what-name"
+section: "blog"
+pillar: "pattern-library"
+excerpt: "The companion to a deployment post-mortem. Provenance answers where code came from; two more questions decide whether a system is safe to run and possible to reach — who is allowed to change it (RBAC) and by what name it is found (DNS). Both are simple once reduced to first principles."
+tags: ["rbac", "authorization", "dns", "security", "patterns", "fundamentals"]
+status: "draft"
+readingTime: "7 min read"
+---
+
+The [previous post](/blog/live-in-production-absent-from-git) was a post-mortem: code that ran in production for four days while existing in no git commit. The idea that resolved it was *provenance* — production must be a pure function of a commit. That answers **where did this come from.**
+
+Two more questions decide whether a system is safe to run and possible to reach: **who is allowed to change it**, and **by what name is it found.** These are the domains of access control and of DNS. Neither is complicated once you strip it to first principles, and both showed up as latent causes in that same incident. This is the mental-model companion piece.
+
+## Authentication is not authorization
+
+Two questions get conflated constantly, and keeping them apart clears up most of the confusion around security.
+
+- **Authentication (authn)** — *who are you?* Proving identity: a password, an SSH key, a token.
+- **Authorization (authz)** — *what may you do?* Permission: deploy to production, drop a table, merge to `main`.
+
+A system can know exactly who you are and still refuse you. That is not a failure — it is the entire point of authorization. And most real incidents are authz failures, not authn failures: the *right* identity, or an *over-powered* token, doing something it should never have been *able* to do.
+
+The four-day ghost from the last post was partly an authz failure. A workstation held a Vercel token that *could* push straight to production. Nobody's identity was in question. The problem was that a machine which should only ever have been able to create preview builds was, in fact, authorized to deploy live. Least privilege was missing.
+
+## RBAC — permission through roles
+
+Role-Based Access Control is the dominant model for authorization. Instead of granting permissions to each individual — which neither scales nor audits — you insert a layer between subjects and the things they can touch:
+
+```
+subject            →   role        →   permission           →   resource
+"Craig"            →   deployer    →   create prod deploy   →   the site project
+"github-actions"   →   ci          →   run build + tests    →   the pipeline
+a laptop token     →   (none)      →   —                    →   —
+```
+
+You grant *roles*; roles bundle permissions. The indirection is not bureaucracy — it buys three concrete properties:
+
+- **Least privilege.** Each subject gets the minimum it needs and nothing more.
+- **Separation of duties.** The token that runs your tests cannot ship to production. Different jobs, different roles, no overlap.
+- **Auditability.** You answer "who can touch production?" by listing the members of one role — not by inspecting every user and token in the system.
+
+Here is the move that matters, generalised. "Put the production-deploy token *only* in CI" is simply least privilege applied to a *machine* subject. The CI system gets a narrow role that can deploy; humans and agents get no such role. Now no workstation can ship to production even if it is compromised, because it was never authorized to in the first place.
+
+RBAC does not ask you to trust people less. It makes the dangerous action **unreachable from the wrong place.** That is a much stronger guarantee than a policy document that says "please don't deploy from your laptop."
+
+You are almost certainly already using authorization without naming it:
+
+- **Branch protection** on a repo is authz on source: *who may advance `main`?* → only a passing, reviewed pull request.
+- **Row-level security** in a database is authz on data: *which rows may this role read or write?* → only its own tenant's.
+- **Team roles** on a deploy platform are authz on shipping: *who may create a production deployment?*
+
+Same model everywhere: subjects, roles, permissions, resources.
+
+## DNS — how a name becomes a server
+
+Servers are reachable by IP address — a number. Humans use names. Something has to translate name → address, globally, in milliseconds. That something is the **Domain Name System**, and it is best understood as the internet's distributed phone book.
+
+A lookup walks a hierarchy. Your resolver asks "what is `example.com`?" and works down: the root servers, then the servers for the top-level domain (`.com`), then the domain's own **nameservers**, which give the authoritative answer. Whoever controls the nameservers controls where the name points. This is why "who owns the DNS?" is a real, blocking question when you go to launch — it is the single control point for the entire domain.
+
+The entries in that phone book are **records**. The ones that matter for hosting:
+
+| Record | Maps | Used for |
+|--------|------|----------|
+| `A` / `AAAA` | name → IPv4 / IPv6 address | pointing a domain at a server |
+| `CNAME` | name → another name | pointing a subdomain at a host |
+| `TXT` | name → arbitrary text | *proving ownership* to a provider |
+| `NS` | domain → its nameservers | delegating who is authoritative |
+
+Attaching a custom domain to any host — Vercel, Netlify, a raw server, it doesn't matter — is always the same dance:
+
+1. Tell the host you want the domain.
+2. The host hands you records: a `TXT` to *prove you own it*, plus an `A` or `CNAME` to *point traffic at it*.
+3. You add those records wherever the nameservers live.
+4. You wait for **propagation**, because resolvers cache answers for a duration called the **TTL** (time-to-live). Changes are not instant by design.
+
+Notice what does *not* change: the code. DNS is purely the naming layer sitting in front of a deployment. A site on `myapp.vercel.app` and the same site on `myapp.com` are byte-identical deployments — only the name in front of them differs.
+
+## Defense in depth
+
+None of these controls is trusted to be perfect on its own. You layer them, and you prefer **fail-closed** gates — ones that default to *deny*, so a broken or missing check blocks rather than waves things through.
+
+```
+provenance    →  every prod artifact traces to a commit      (production = f(commit))
+authz / RBAC  →  only the right subject can deploy or merge   (least privilege)
+naming / DNS  →  a controlled name points at that deploy      (ownership = control)
+```
+
+In sequence: commit the code so it has provenance; gate the branch so only a reviewed, green build can advance it; starve the workspace-upload path of a production token so it cannot be bypassed; and only then attach the real domain. Each layer catches what the one before it might miss. Remove any single layer and the others still hold the line.
+
+## Test yourself
+
+If these landed, you should be able to answer:
+
+1. Why can a deployment exist that no commit contains? (Provenance — the post-mortem.)
+2. What is the difference between authentication and authorization, and which one does a "require a pull request" rule enforce?
+3. If a domain points at the wrong server, which DNS record is the likely culprit — and who has to change it?
+
+None of this is Vercel-specific, or even deployment-specific. Provenance, authorization, and naming are three of the load-bearing ideas underneath almost every system you will ever operate. The incident just happened to put all three on the same table at once.

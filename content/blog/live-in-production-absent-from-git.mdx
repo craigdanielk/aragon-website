@@ -1,0 +1,112 @@
+---
+title: "Live in Production, Absent from Git: A Deployment Provenance Post-Mortem"
+date: "2026-07-28"
+slug: "live-in-production-absent-from-git"
+section: "blog"
+pillar: "operations"
+excerpt: "For four days a login page and a dozen app screens served real traffic on a client's marketing site — while existing in zero git commits. Then a routine deploy erased them. This is the incident, and the single idea that makes the paradox dissolve: production must be a pure function of a commit."
+tags: ["deployment", "vercel", "git", "provenance", "operations", "ci-cd"]
+status: "draft"
+readingTime: "8 min read"
+---
+
+Here is a sentence that sounds impossible. For roughly four days, a login page and a dozen application screens ran in production on a client's marketing site — a friend logged into it from his phone — while existing in *zero* git commits. Not on a branch. Not in history. Nowhere `git` could see them. Then a routine deploy erased them and every one of those routes started returning `404`.
+
+The operator was certain, and rightly so, that the app had been live and shareable. I had been equally certain, and wrongly so, that it had "never been deployed" because `git log` showed the files in no commit. We were both looking at true facts and drawing opposite conclusions. The reconciliation is a single idea that every operations engineer eventually internalises, and once you see it the paradox dissolves completely.
+
+No files were lost. Nothing was hacked. This is a story about where deployed bytes come from.
+
+## The setup
+
+The site is a Next.js app on Vercel. Marketing pages at the root, and — recently — an authenticated app-shell being folded in under `/app/*` with a `/login` page. Standard git-connected deployment: push to `main`, Vercel builds, the site updates.
+
+When I picked the work up, the working tree was full of uncommitted changes: the entire app-shell — twelve route files, a login page, a component kit, some libraries — sat there as **untracked files**. Twenty-two files, never `git add`ed. My first instinct was to clean up: I moved them onto a feature branch, pushed it, and left `main` alone.
+
+That is when the operator told me they had shared the *marketing site URL* and a friend had logged into the app on their phone — before I touched anything. And my careful `git` archaeology said those files had never been in a single commit, on any branch, ever.
+
+Both statements were true. Here is why.
+
+## Bytes on a server
+
+Strip a running production system of its romance and it is just **bytes on a server**. The defining question of operations is whether you can trace those bytes back to a known, reviewed source. If you can, the system is *reproducible*: you can rebuild it, audit it, and roll it back with confidence. If you cannot, you are serving bytes of unknown origin to real users — and you cannot review what you cannot locate.
+
+The principle that guarantees traceability is worth stating as an equation:
+
+```
+production = f(commit)
+```
+
+Production should be a pure *function* of a version-control commit. The same commit SHA in yields the same deployed site out, and — crucially — **nothing lives in production that isn't in the commit.** When that holds, "what is running?" always has an answer: a SHA you can check out.
+
+The incident was what it looks like when that function is violated.
+
+## Two ways bytes reach a server
+
+This is the crux, and it generalises far beyond Vercel. There are two fundamentally different mechanisms for producing a deployment, and to an observer they look identical — the site just updates.
+
+**Build from source control.** The platform *clones the repository at a commit* and builds from that clone. The artifact is, by construction, exactly the committed files. Provenance is perfect: the deploy corresponds to a SHA.
+
+**Upload the workspace.** A tool *tars up whatever files are sitting on disk* and ships them. This is what `vercel --prod` from your laptop does. It does not care what git tracks — it uploads the working directory, **untracked files included.** Provenance is nonexistent: there is no commit that describes what shipped.
+
+Every "how is it deployed but not committed?" paradox in the history of software is the second path wearing the first path's clothes.
+
+## What actually happened
+
+The timeline, once I read the deployment log instead of only the git log:
+
+1. An earlier session deployed via the CLI from a **dirty working tree**. The app-shell files were on disk (just never committed), so the workspace-upload swept them into production. They went live. The friend logged in. Entirely real.
+2. Later, someone pushed a routine commit to `main`. That triggered a **build-from-source-control** deploy — Vercel cloned the repo at that commit. The clone did not contain the untracked app-shell, because untracked files do not exist in a clone. The rebuild silently dropped them.
+3. Live one day, `404` the next. Both deploys reported success. Neither was "broken."
+
+The 404 predated my work entirely. But my explanation for it — "never deployed" — was wrong, because I trusted `git log` as the source of truth about what was in production. In a world where dirty uploads are possible, it isn't.
+
+## The tell was in plain sight
+
+Vercel had been flagging this the entire time. Every workspace-upload deploy in the history carried a marker in its metadata:
+
+```
+gitDirty: 1
+```
+
+That flag is the platform telling you, in its own words: *"the bytes I shipped do not match the commit I recorded."* It is the signature of code with no provenance. Reading it is a skill worth building — a deploy list where production deploys carry `gitDirty: 1` is a deploy list where production is not a function of any commit.
+
+```bash
+# safe: platform clones at the SHA, only committed files can appear
+git push origin main            # → deploy 23f80a1  gitDirty: 0
+
+# dangerous: tars the working directory, uploads untracked files too
+vercel --prod                   # → deploy ........  gitDirty: 1  ← no provenance
+```
+
+## A newer door to the same room
+
+It is tempting to assume a friendlier tool is safer than a raw CLI. I assumed exactly that about a deploy action exposed over MCP — surely a managed integration deploys "properly." So I checked its contract before trusting it. It takes a *file tree* and a target of `production`, and auto-detects the framework.
+
+That is a workspace-upload tool by definition. It ships whatever bytes it is handed, with no notion of "committed," and it will target production directly. If anything it is more dangerous than the CLI, because it can create a brand-new project on the fly.
+
+The lesson: the protection was never *which tool you use.* It is *whether the deploy path builds from a commit or uploads from disk.* Every tool is one or the other, and you have to know which.
+
+## The fix, and why it is permanent
+
+Two moves restore the invariant and keep it:
+
+1. **Commit the files.** The app-shell went into `main` through a proper merge. Now the safe build-from-source-control path *contains* it — so every future clean deploy keeps it, instead of erasing it. Provenance restored.
+2. **Gate the safe path so the dangerous one is never needed.** A required CI check (`predeploy-guard` + a real build) runs on every pull request into `main`, and branch protection makes it mandatory. The guard is fail-closed: it *blocks* the deploy if the working tree is dirty or any source under the deploy root is untracked, rather than warning and proceeding.
+
+```bash
+# the guard, in one sentence of shell
+untracked=$(git ls-files --others --exclude-standard -- "$SRC")
+[ -n "$untracked" ] && { echo "BLOCKED: untracked source would ship without a commit"; exit 1; }
+```
+
+After that, a workspace upload to production is neither necessary nor trusted. The equation holds again: production is a function of a commit, and only of a commit.
+
+## What to take away
+
+- A running system is bytes on a server; the whole game is being able to trace those bytes to a reviewed source.
+- `production = f(commit)` — nothing in prod that isn't in a commit.
+- Two deploy paths exist: *clone-a-commit* (has provenance) and *upload-the-workspace* (has none). They look identical and are not.
+- `gitDirty: 1` is the platform confessing that a deploy has no provenance. Learn to read it.
+- The fix is never "remember not to do the bad thing." It is to make the good path the *only gated* path, with a fail-closed check — so the bad path is unnecessary and untrusted.
+
+If you run anything on a platform that offers a CLI deploy, go look at your production deployment list right now and check the dirty flag. If any production deploy is dirty, your site is one clean redeploy away from changing in ways no commit can explain.
